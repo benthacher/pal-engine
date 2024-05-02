@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.29)
 project(pal_engine)
 
-if("${PAL_BACKEND}" STREQUAL "")
-    message(FATAL_ERROR "PAL Backend not set! Before including PAL as a subdirectory, make sure to set the PAL_BACKEND variable to the source that implements PAL functions.")
+if("${PAL_BACKEND_SOURCES}" STREQUAL "")
+    message(FATAL_ERROR "PAL Backend not set! Before including PAL as a subdirectory, make sure to set the PAL_BACKEND_SOURCES variable to the source that implements PAL functions.")
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
@@ -27,13 +27,13 @@ add_library(pal_engine
     src/entity.c
     src/audio.c
     src/midi_parse.c
-    ${PAL_BACKEND}
+    ${PAL_BACKEND_SOURCES}
     ${GENERATED_MIDI_C_FILES}
     ${GENERATED_SPRITE_C_FILES}
 )
 
 add_dependencies(pal_engine generated_midi_files generated_sprite_files)
 
-target_include_directories(pal_engine PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/include)
+target_include_directories(pal_engine PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/include ${PAL_BACKEND_INCLUDES})
 
-target_link_libraries(pal_engine m)
+target_link_libraries(pal_engine m ${PAL_BACKEND_LIBRARIES})
