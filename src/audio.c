@@ -8,12 +8,6 @@
 #include <unistd.h>
 
 #include "pal.h"
-#include "drums/snare_wav.h"
-#include "drums/closed_hat_wav.h"
-#include "drums/open_hat_wav.h"
-#include "drums/kick_wav.h"
-#include "drums/cowbell_wav.h"
-#include "drums/crash_wav.h"
 
 #define MAX_NUM_MIDI_PLAYERS 10
 #define MAX_NUM_OSCILLATORS 100
@@ -252,8 +246,7 @@ void midi_player_delete(struct midi_player *player) {
 }
 
 int32_t square_wave(uint32_t t) {
-    return sinf(2 * M_PI / OSC_PERIOD * t) * OSC_AMPLITUDE;
-    // return (t < OSC_PERIOD / 10) ? OSC_AMPLITUDE : -OSC_AMPLITUDE;
+    return (t < OSC_PERIOD / 2) ? OSC_AMPLITUDE : -OSC_AMPLITUDE;
 }
 
 static void midi_player_assign_drum_sample_to_note(struct midi_player *player, uint8_t note_number, int sample_number, const struct wave_data *wave_data) {
@@ -271,19 +264,19 @@ void midi_player_init(struct midi_player *player) {
     memset(player->note_to_drum_sample, -1, sizeof(player->note_to_drum_sample));
 
     // add da samples!
-    midi_player_assign_drum_sample_to_note(player, 38, 0, &snare_wav);
-    midi_player_assign_drum_sample_to_note(player, 40, 0, &snare_wav);
-    midi_player_assign_drum_sample_to_note(player, 35, 1, &kick_wav);
-    midi_player_assign_drum_sample_to_note(player, 36, 1, &kick_wav);
-    midi_player_assign_drum_sample_to_note(player, 49, 2, &crash_wav);
-    midi_player_assign_drum_sample_to_note(player, 52, 2, &crash_wav);
-    midi_player_assign_drum_sample_to_note(player, 55, 2, &crash_wav);
-    midi_player_assign_drum_sample_to_note(player, 44, 3, &closed_hat_wav);
-    midi_player_assign_drum_sample_to_note(player, 42, 3, &closed_hat_wav);
-    midi_player_assign_drum_sample_to_note(player, 46, 4, &open_hat_wav);
-    midi_player_assign_drum_sample_to_note(player, 56, 5, &cowbell_wav);
-    midi_player_assign_drum_sample_to_note(player, 62, 5, &cowbell_wav);
-    midi_player_assign_drum_sample_to_note(player, 54, 5, &cowbell_wav);
+    // midi_player_assign_drum_sample_to_note(player, 38, 0, &snare_wav);
+    // midi_player_assign_drum_sample_to_note(player, 40, 0, &snare_wav);
+    // midi_player_assign_drum_sample_to_note(player, 35, 1, &kick_wav);
+    // midi_player_assign_drum_sample_to_note(player, 36, 1, &kick_wav);
+    // midi_player_assign_drum_sample_to_note(player, 49, 2, &crash_wav);
+    // midi_player_assign_drum_sample_to_note(player, 52, 2, &crash_wav);
+    // midi_player_assign_drum_sample_to_note(player, 55, 2, &crash_wav);
+    // midi_player_assign_drum_sample_to_note(player, 44, 3, &closed_hat_wav);
+    // midi_player_assign_drum_sample_to_note(player, 42, 3, &closed_hat_wav);
+    // midi_player_assign_drum_sample_to_note(player, 46, 4, &open_hat_wav);
+    // midi_player_assign_drum_sample_to_note(player, 56, 5, &cowbell_wav);
+    // midi_player_assign_drum_sample_to_note(player, 62, 5, &cowbell_wav);
+    // midi_player_assign_drum_sample_to_note(player, 54, 5, &cowbell_wav);
 
     add_midi_player(player);
 }
