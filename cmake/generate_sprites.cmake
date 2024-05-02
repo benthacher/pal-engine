@@ -1,5 +1,5 @@
 function(generate_sprites SPRITE_FILES OUTPUT_SRC_DIR OUTPUT_INC_DIR OUTPUT_SOURCE_FILES_LIST)
-    include(${CMAKE_SOURCE_DIR}/cmake/util.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/util.cmake)
 
     # Make the desired output directories
     file(MAKE_DIRECTORY ${OUTPUT_SRC_DIR})
