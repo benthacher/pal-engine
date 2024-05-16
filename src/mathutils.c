@@ -17,6 +17,10 @@ float vec2_mag(struct vec2 *v) {
     return hypotf(v->x, v->y);
 }
 
+float vec2_squared_mag(struct vec2 *v) {
+    return v->x * v->x + v->y * v->y;
+}
+
 float vec2_dir(struct vec2 *v) {
     return atan2f(v->y, v->x);
 }
