@@ -4,14 +4,31 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "graphics.h"
 #include "physics.h"
 #include "sprite.h"
 
-static struct entity_config_flags default_config_flags = {
-    .do_physics = 1
+// every uninitialized entity event is zero, meaning no event data is used
+static size_t event_data_lengths[NUM_ENTITY_EVENTS] = {
+    [ENTITY_EVENT_BUTTON_UP] = sizeof(enum button),
+    [ENTITY_EVENT_BUTTON_DOWN] = sizeof(enum button)
 };
+
+const char *entity_event_str(enum entity_event event) {
+    switch (event) {
+        case ENTITY_EVENT_UPDATE: return "ENTITY_EVENT_UPDATE";
+        case ENTITY_EVENT_CLICK: return "ENTITY_EVENT_CLICK";
+        case ENTITY_EVENT_RELEASE: return "ENTITY_EVENT_RELEASE";
+        case ENTITY_EVENT_DRAG_START: return "ENTITY_EVENT_DRAG_START";
+        case ENTITY_EVENT_DRAG_STOP: return "ENTITY_EVENT_DRAG_STOP";
+        case ENTITY_EVENT_SPRITE_LOOP_END: return "ENTITY_EVENT_SPRITE_LOOP_END";
+        case ENTITY_EVENT_BUTTON_UP: return "ENTITY_EVENT_BUTTON_UP";
+        case ENTITY_EVENT_BUTTON_DOWN: return "ENTITY_EVENT_BUTTON_DOWN";
+        default: return "Unknown Event";
+    }
+}
 
 void entity_set_sprite_def(struct entity *entity, struct sprite_def *sprite_def) {
     if (entity->type != ENTITY_DRAW_TYPE_SPRITE)
@@ -22,17 +39,20 @@ void entity_set_sprite_def(struct entity *entity, struct sprite_def *sprite_def)
     sprite_init(&entity->sprite, sprite_def);
 }
 
-void entity_set_config(struct entity *entity, struct entity_config_flags config) {
-    entity->config_flags = config;
-}
-
 void entity_init(struct entity *entity, float mass) {
     // make sure event handlers are null
     for (int i = 0; i < NUM_ENTITY_EVENTS; i++) {
         entity->_event_handlers[i] = NULL;
     }
 
-    entity_set_config(entity, default_config_flags);
+    // clear event flags
+    entity->_state_flags = 0;
+
+    // initialize event queue
+    queue_init(&entity->_event_queue, entity->_event_queue_buffer, sizeof(entity->_event_queue_buffer));
+
+    // enable physics by default
+    entity_state_set(entity, ENTITY_STATE_DO_PHYSICS);
 
     physics_init(&entity->phys, mass);
 }
@@ -118,32 +138,65 @@ void entity_attach_handler(struct entity *entity, enum entity_event event, entit
 }
 
 void entity_event_emit(struct entity *entity, enum entity_event event, void *data, size_t data_len) {
-    if (event > NUM_ENTITY_EVENTS)
+    // if event is invalid or event handler hasn't been attached, return
+    if (event > NUM_ENTITY_EVENTS || entity->_event_handlers[event] == NULL)
         return;
 
-    if (data != NULL && data_len > 0) {
-        // copy data to heap
-        void *heap_data = malloc(data_len);
-        memcpy(heap_data, data, data_len);
-        entity->_event_data[event] = heap_data;
-    } else {
-        entity->_event_data[event] = NULL;
-    }
+    // add event id byte to event queue
+    entity_event_id_t event_id = event;
+    queue_write(&entity->_event_queue, &event_id, sizeof(event_id));
 
-    // set event flag
-    entity->_event_flags |= (1 << event);
+    // write event data to queue
+    if (data != NULL && event_data_lengths[event] > 0) {
+        if (!queue_write(&entity->_event_queue, data, event_data_lengths[event]))
+            printf("Failed to write event data to queue! Increase the size of entity event queue.\n");
+    }
 }
 
-void entity_call_event_handler(struct entity *entity, enum entity_event event) {
-    if (event > NUM_ENTITY_EVENTS)
+void entity_handle_pending_events(struct entity *entity) {
+    entity_event_id_t event_id;
+    void *event_data;
+
+    while (queue_get_remaining(&entity->_event_queue) > 0) {
+        if (!queue_read(&entity->_event_queue, &event_id, sizeof(event_id)))
+            break;
+
+        if (entity->_event_handlers[event_id] != NULL) {
+            if (event_data_lengths[event_id] > 0) {
+                uint8_t event_data_payload[event_data_lengths[event_id]];
+
+                // read event data into array and call handler with data
+                if (!queue_read(&entity->_event_queue, event_data_payload, event_data_lengths[event_id]))
+                    break;
+
+                entity->_event_handlers[event_id](entity, (void *) event_data_payload);
+            } else {
+                // event has no data associated with it, call handler without passing data
+                entity->_event_handlers[event_id](entity, NULL);
+            }
+        }
+    }
+}
+
+void entity_state_set(struct entity *entity, enum entity_state state) {
+    if (state > NUM_ENTITY_STATES)
         return;
 
-    if (entity->_event_handlers[event] != NULL) {
-        entity->_event_handlers[event](entity, entity->_event_data[event]);
-        free(entity->_event_data[event]);
-    }
+    entity->_state_flags |= 1 << state;
+}
 
-    entity_event_clear(entity, event);
+void entity_state_clear(struct entity *entity, enum entity_state state) {
+    if (state > NUM_ENTITY_STATES)
+        return;
+
+    entity->_state_flags &= ~(1 << state);
+}
+
+bool entity_state_check(struct entity *entity, enum entity_state state) {
+    if (state > NUM_ENTITY_STATES)
+        return false;
+
+    return (entity->_state_flags & (1 << state)) ? true : false;
 }
 
 void entity_scale(struct entity *entity, float factor) {
@@ -217,6 +270,7 @@ void entity_render(struct entity *entity) {
     // draw entity at physical position
     int draw_x = round(entity->phys.position.x);
     int draw_y = round(entity->phys.position.y);
+    bool previous_finished_flag;
 
     switch (entity->type) {
         case ENTITY_DRAW_TYPE_SIMPLE:
@@ -232,25 +286,17 @@ void entity_render(struct entity *entity) {
                 return;
 
             sprite_draw(&entity->sprite, draw_x, draw_y, entity->phys.angle, entity->scale);
+
+            previous_finished_flag = entity->sprite.finished;
             sprite_update(&entity->sprite);
-            break;
+
+            if (entity->sprite.finished && !previous_finished_flag)
+            {
+                entity_event_emit(entity, ENTITY_EVENT_SPRITE_LOOP_END, NULL, 0);
+            }
+
         case ENTITY_DRAW_TYPE_INVISIBLE:
         default:
             break;
     }
-}
-
-
-bool entity_event_check(struct entity *entity, enum entity_event event) {
-    if (event > NUM_ENTITY_EVENTS)
-        return false;
-
-    return (entity->_event_flags & (1 << event)) ? true : false;
-}
-
-void entity_event_clear(struct entity *entity, enum entity_event event) {
-    if (event > NUM_ENTITY_EVENTS)
-        return;
-
-    entity->_event_flags &= ~(1 << event);
 }
