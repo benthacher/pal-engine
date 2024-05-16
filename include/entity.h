@@ -3,6 +3,7 @@
 #include "physics.h"
 #include "sprite.h"
 #include "graphics.h"
+#include "queue.h"
 
 #include <stdlib.h>
 #include <stddef.h>
@@ -30,12 +31,29 @@ enum entity_event {
     ENTITY_EVENT_UPDATE = 0,
     ENTITY_EVENT_CLICK,
     ENTITY_EVENT_RELEASE,
-    ENTITY_EVENT_BUTTON,
+    ENTITY_EVENT_DRAG_START,
+    ENTITY_EVENT_DRAG_STOP,
+    ENTITY_EVENT_SPRITE_LOOP_END,
+    ENTITY_EVENT_BUTTON_UP,
+    ENTITY_EVENT_BUTTON_DOWN,
 
     NUM_ENTITY_EVENTS
 };
 
-_Static_assert(NUM_ENTITY_EVENTS < 32, "Too many entity events! Increase the size of config_flags or decrease number of events!");
+enum entity_state {
+    ENTITY_STATE_DRAGGING = 0,
+    ENTITY_STATE_DRAGGABLE,
+    ENTITY_STATE_DO_PHYSICS,
+    ENTITY_STATE_CLICKED,
+    ENTITY_STATE_SPRITE_LOOP_ENDED,
+
+    NUM_ENTITY_STATES
+};
+
+typedef uint8_t entity_event_id_t;
+
+_Static_assert(NUM_ENTITY_EVENTS < 256, "Too many entity events! Increase the size of entity_event_id_t or decrease number of events!");
+_Static_assert(NUM_ENTITY_STATES < 32, "Too many entity states! Increase the size of _state_flags or decrease number of states!");
 
 /**
  * @brief Event handler typedef
@@ -44,10 +62,6 @@ _Static_assert(NUM_ENTITY_EVENTS < 32, "Too many entity events! Increase the siz
  * void * event data (type dependent)
  */
 typedef void (*entity_event_handler_t)(struct entity *, void *);
-
-struct entity_config_flags {
-    uint32_t do_physics : 1;
-};
 
 struct entity {
     struct phys_data phys;      // physical data (position, velocity, etc.)
@@ -59,12 +73,12 @@ struct entity {
             float scale;
         };
     };
-    struct entity_config_flags config_flags;
 
     // private stuff
+    struct queue _event_queue;
+    uint8_t _event_queue_buffer[100];
     entity_event_handler_t _event_handlers[NUM_ENTITY_EVENTS];
-    void *_event_data[NUM_ENTITY_EVENTS];
-    uint32_t _event_flags;
+    uint32_t _state_flags;
 };
 
 /**
@@ -74,14 +88,6 @@ struct entity {
  * @param mass mass
  */
 void entity_init(struct entity *entity, float mass);
-
-/**
- * @brief Sets config on entity
- *
- * @param entity
- * @param config
- */
-void entity_set_config(struct entity *entity, struct entity_config_flags config);
 
 /**
  * @brief Scales entity's bounds by given factor
@@ -138,30 +144,37 @@ void entity_attach_handler(struct entity *entity, enum entity_event event, entit
 void entity_event_emit(struct entity *entity, enum entity_event event, void *data, size_t data_len);
 
 /**
- * @brief Call event handler for entity based on given event with given data
+ * @brief Handles all pending events on entity
  *
  * @param entity
- * @param event
- * @param event_data
  */
-void entity_call_event_handler(struct entity *entity, enum entity_event event);
+void entity_handle_pending_events(struct entity *entity);
 
 /**
- * @brief Checks if given event is set on entity
+ * @brief Sets given state on entity
  *
  * @param entity
- * @param event
- * @return event status
+ * @param state
  */
-bool entity_event_check(struct entity *entity, enum entity_event event);
+void entity_state_set(struct entity *entity, enum entity_state state);
 
 /**
- * @brief Clears given event on entity
+ * @brief Clears given state on entity
  *
  * @param entity
- * @param event
+ * @param state
  */
-void entity_event_clear(struct entity *entity, enum entity_event event);
+void entity_state_clear(struct entity *entity, enum entity_state state);
+
+/**
+ * @brief Checks if given state is present on entity
+ *
+ * @param entity
+ * @param state
+ * @return true
+ * @return false
+ */
+bool entity_state_check(struct entity *entity, enum entity_state state);
 
 /**
  * @brief Renders entity

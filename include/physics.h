@@ -48,11 +48,63 @@ struct collision_manifold {
     struct vec2 *contact;
 };
 
-// void physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
 // void physics_resolve_collision(struct collision_manifold *collision);
+/**
+ * @brief Initializes physics data
+ *
+ * @param phys
+ * @param mass
+ */
 void physics_init(struct phys_data *phys, float mass);
+
+/**
+ * @brief Sets up phys_data to be polygonal
+ *
+ * @param phys
+ * @param n_vertices
+ * @param vertices
+ */
 void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct vec2 *vertices);
+
+/**
+ * @brief Sets up phys_data to have circular bounds
+ *
+ * @param phys
+ * @param radius
+ */
 void physics_set_bounds_circle(struct phys_data *phys, float radius);
+
+/**
+ * @brief Sets up phys_data to be rectangular
+ *
+ * @param phys
+ * @param width
+ * @param height
+ */
 void physics_set_bounds_rect(struct phys_data *phys, float width, float height);
+
+/**
+ * @brief Integrates phys_data given time step (dt)
+ *
+ * @param phys
+ * @param dt time step in seconds
+ */
 void physics_integrate(struct phys_data *phys, float dt);
+
+/**
+ * @brief Scales phys_data bounds by given factor
+ *
+ * @param phys
+ * @param factor
+ */
 void physics_scale_bounds(struct phys_data *phys, float factor);
+
+/**
+ * @brief Checks if point is inside phys_data bounds
+ *
+ * @param phys
+ * @param point
+ * @return true
+ * @return false
+ */
+bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point);

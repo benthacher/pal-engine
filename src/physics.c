@@ -84,46 +84,42 @@ void physics_scale_bounds(struct phys_data *phys, float factor) {
     find_furthest_vertex_squared(phys);
 }
 
-void physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
-    // if (phys->bounds.type == BOUNDS_TYPE_POLY) {
-    //     for (int i = 0; i < phys->bounds.n_vertices; i++) {
-    //         const p3 = vec.copy().subtract(this.pos);
+bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
+    struct vec2 distance_vec;
+    vec2_sub(point, &phys->position, &distance_vec);
 
-    //         if (p3.mag() > phys->bounds.furthest)
-    //             continue;
+    // if the point isn't within the maximum vertex, just return false
+    if (vec2_squared_mag(&distance_vec) > phys->bounds.furthest_vertex_squared)
+        return false;
 
-    //         let p1 = phys->bounds.points[i].copy();
-    //         let p2 = phys->bounds.points[(i + 1) % phys->bounds.n_vertices].copy();
+    if (phys->bounds.type == BOUNDS_TYPE_POLY) {
+        struct vec2 p1, p2, p3;
+        int pos = 0;
+        int neg = 0;
 
-    //         p1.setDir(p1.dir() + this.angle);
-    //         p2.setDir(p2.dir() + this.angle);
+        for (int i = 0; i < phys->bounds.n_vertices; i++) {
+            vec2_add(&phys->position, &phys->bounds.vertices[i], &p1);
+            vec2_add(&phys->position, &phys->bounds.vertices[(i + 1) % phys->bounds.n_vertices], &p2);
 
-    //         // if p3's direction not is between p1 and p2's direction, skip
-    //         const p3_dot_p2 = p3.dot(p2);
-    //         const p3_dot_p1 = p3.dot(p1);
+            vec2_sub(point, &p1, &p3);
+            vec2_sub(&p2, &p1, &p2);
 
-    //         if (!(p3_dot_p2 > 0 && p3_dot_p1 > 0) && p3_dot_p1 != 0 && p3_dot_p2 != 0)
-    //             continue;
+            float d = vec2_cross(&p3, &p2);
 
-    //         p1.x = p1.x || 0.000001;
-    //         p2.x = p2.x || 0.000001;
-    //         p3.x = p3.x || 0.000001;
-    //         p1.y = p1.y || 0.000001;
-    //         p2.y = p2.y || 0.000001;
-    //         p3.y = p3.y || 0.000001;
+            if (d > 0) pos++;
+            if (d < 0) neg++;
 
-    //         // solve it parametrically so there's no weird infinite slope garbage
-    //         const t2 = (p1.x / p3.x - p1.y / p3.y) / ((p2.y - p1.y) / p3.y - (p2.x - p1.x) / p3.x);
+            //If the sign changes, then point is outside
+            if (pos > 0 && neg > 0)
+                return false;
+        }
 
-    //         const intersection = p2.subtract(p1).scale(t2).add(p1);
-
-    //         if (p3.mag() < intersection.mag())
-    //             return p2.copy().subtract(p1).normalize().perp(); // return the normal vector to the edge that the point collides with
-    //     }
-    //     return false;
-    // } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
-    //     return dist(this.pos, vec) < phys->bounds.furthest;
-    // }
+        return true;
+    } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
+        // by this point we know the point we're testing is within the furthest point, and for a
+        // circle, that means it's within the circle
+        return true;
+    }
 }
 
 void physics_resolve_collision(struct collision_manifold *collision) {

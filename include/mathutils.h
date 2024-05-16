@@ -51,6 +51,14 @@ float lerp(float x1, float x2, float t);
 float vec2_mag(struct vec2 *v);
 
 /**
+ * @brief Computes the squared magnitude of vector
+ *
+ * @param v
+ * @return float
+ */
+float vec2_squared_mag(struct vec2 *v);
+
+/**
  * @brief Direction of vector
  *
  * @param v

@@ -215,7 +215,7 @@ def img_to_sprite(image, output_source_dir, output_include_dir, include_path, lo
     output_include_path = Path(output_include_dir)
     image_name = sanitize_image_name(Path(image).stem)
 
-    result = f'#include "{Path(include_path, get_sprite_symbol(image_name))}.h"\n#include "sprite.h"\n\n'
+    result = f'#include "{Path(include_path, image_name)}.h"\n#include "sprite.h"\n\n'
 
     in_image = Image.open(image)
 

@@ -1,4 +1,3 @@
-#include "sim.h"
 #include "font.h"
 #include <stdint.h>
 #include <stddef.h>

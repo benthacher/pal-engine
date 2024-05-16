@@ -27,6 +27,7 @@ add_library(pal_engine
     src/entity.c
     src/audio.c
     src/midi_parse.c
+    src/queue.c
     ${PAL_BACKEND_SOURCES}
     ${GENERATED_MIDI_C_FILES}
     ${GENERATED_SPRITE_C_FILES}
