@@ -48,7 +48,6 @@ struct collision_manifold {
     struct vec2 *contact;
 };
 
-// void physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
 // void physics_resolve_collision(struct collision_manifold *collision);
 void physics_init(struct phys_data *phys, float mass);
 void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct vec2 *vertices);
@@ -56,3 +55,4 @@ void physics_set_bounds_circle(struct phys_data *phys, float radius);
 void physics_set_bounds_rect(struct phys_data *phys, float width, float height);
 void physics_integrate(struct phys_data *phys, float dt);
 void physics_scale_bounds(struct phys_data *phys, float factor);
+bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
