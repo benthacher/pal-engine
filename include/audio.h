@@ -123,15 +123,98 @@ struct midi_player {
     struct midi_parser parser;
 };
 
+/**
+ * @brief Initializes oscillator with given ADSR parameters and waveform function
+ *
+ * @param osc
+ * @param attack_ms
+ * @param decay_ms
+ * @param sustain_value
+ * @param release_ms
+ * @param waveform
+ */
 void oscillator_init(struct oscillator *osc, uint32_t attack_ms, uint32_t decay_ms, int16_t sustain_value, uint32_t release_ms, oscillator_waveform_func_t waveform);
+
+/**
+ * @brief Deletes oscillator from active oscillators
+ *
+ * @param osc
+ */
 void oscillator_delete(struct oscillator *osc);
+
+/**
+ * @brief Plays tone on oscillator, returning the voice the tone is played on
+ *
+ * @param osc
+ * @param amplitude
+ * @param frequency
+ * @return enum oscillator_voice_num
+ */
 enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t amplitude, float frequency);
+
+/**
+ * @brief Stops given oscillator voice
+ *
+ * @param osc
+ * @param voice
+ */
 void oscillator_stop_voice(struct oscillator *osc, enum oscillator_voice_num voice);
+
+/**
+ * @brief Changes frequency of oscillator voice to given frequency
+ *
+ * @param osc
+ * @param voice
+ * @param frequency
+ */
 void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, float frequency);
+
+/**
+ * @brief Adds filter to filter chain of oscillator
+ *
+ * @param osc
+ * @param filter
+ */
 void oscillator_add_filter(struct oscillator *osc, struct filter_node *filter);
+
+/**
+ * @brief Adds effect node to effect chain on oscillator
+ *
+ * @param osc
+ * @param effect
+ */
 void oscillator_add_effect(struct oscillator *osc, struct effect_node *effect);
+
+/**
+ * @brief Initializes midi player
+ *
+ * @param player
+ */
 void midi_player_init(struct midi_player *player);
+
+/**
+ * @brief Loads midi player with given midi source data
+ *
+ * @param player
+ * @param midi_data_source
+ */
 void midi_player_load_midi(struct midi_player *player, uint8_t *midi_data_source);
+
+/**
+ * @brief Requests audio subsystem to stop outputing sound
+ *
+ */
 void audio_request_stop();
+
+/**
+ * @brief Starts audio subsystem
+ *
+ */
 void audio_start();
+
+/**
+ * @brief Sets master volume
+ *
+ * @param gain
+ */
 void audio_set_master_volume(float gain);
