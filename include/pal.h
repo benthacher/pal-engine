@@ -47,12 +47,7 @@ enum pointer_state {
 };
 
 struct pointer_event {
-    struct {
-        screen_dim_t x;
-        screen_dim_t y;
-    } position;
-    // velocity (pixels / second)
-    struct vec2 velocity;
+    struct vec2 position;
     enum pointer_state state;
 };
 
