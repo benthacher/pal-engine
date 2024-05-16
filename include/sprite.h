@@ -22,8 +22,9 @@ struct sprite_def {
 };
 
 struct sprite {
-    struct sprite_def *sprite_def;
+    bool finished;
     size_t current_frame;
+    struct sprite_def *sprite_def;
     double frame_elapsed_time;
     double previous_time;
 };

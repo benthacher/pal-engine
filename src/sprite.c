@@ -22,13 +22,19 @@ void sprite_update(struct sprite *sprite) {
         // next frame
         if (sprite->current_frame < sprite->sprite_def->num_frames - 1) {
             sprite->current_frame++;
+            sprite->finished = false;
         } else if (sprite->sprite_def->loop) {
             sprite->current_frame = 0;
+            sprite->finished = true;
         }
+
+        if (sprite->current_frame == sprite->sprite_def->num_frames - 1 && !sprite->sprite_def->loop)
+            sprite->finished = true;
     }
 }
 
 void sprite_init(struct sprite *sprite, struct sprite_def *sprite_def) {
+    sprite->finished = false;
     sprite->current_frame = 0;
     sprite->previous_time = 0.0;
     sprite->frame_elapsed_time = 0.0;
