@@ -87,6 +87,7 @@ void physics_scale_bounds(struct phys_data *phys, float factor) {
 bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
     struct vec2 distance_vec;
     vec2_sub(point, &phys->position, &distance_vec);
+    struct vec2 rotated_bounds[phys->bounds.n_vertices];
 
     // if the point isn't within the maximum vertex, just return false
     if (vec2_squared_mag(&distance_vec) > phys->bounds.furthest_vertex_squared)
@@ -98,8 +99,11 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
         int neg = 0;
 
         for (int i = 0; i < phys->bounds.n_vertices; i++) {
-            vec2_add(&phys->position, &phys->bounds.vertices[i], &p1);
-            vec2_add(&phys->position, &phys->bounds.vertices[(i + 1) % phys->bounds.n_vertices], &p2);
+            vec2_rotate(&phys->bounds.vertices[i], phys->angle, &rotated_bounds[i]);
+            vec2_rotate(&phys->bounds.vertices[(i + 1) % phys->bounds.n_vertices], phys->angle, &rotated_bounds[(i + 1) % phys->bounds.n_vertices]);
+
+            vec2_add(&phys->position, &rotated_bounds[i], &p1);
+            vec2_add(&phys->position, &rotated_bounds[(i + 1) % phys->bounds.n_vertices], &p2);
 
             vec2_sub(point, &p1, &p3);
             vec2_sub(&p2, &p1, &p2);
