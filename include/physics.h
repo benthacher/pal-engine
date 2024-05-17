@@ -41,12 +41,12 @@ struct phys_data {
  * @brief Struct describing collision
  *
  */
-struct collision_manifold {
+struct collision_descriptor {
     struct phys_data *phys1;
     struct phys_data *phys2;
-    struct vec2 *normal;
+    struct vec2 normal;
     float penitration_depth;
-    struct vec2 *contact;
+    struct vec2 contact;
 };
 
 // void physics_resolve_collision(struct collision_manifold *collision);
@@ -116,3 +116,14 @@ void physics_compute_translated_bounds(struct phys_data *phys);
  * @return false
  */
 bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
+
+/**
+ * @brief Detects collision between two objects, filling in collision information if collision is detected
+ *
+ * @param phys1
+ * @param phys2
+ * @param collision
+ * @return true
+ * @return false
+ */
+bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision);
