@@ -34,6 +34,7 @@ struct phys_data {
     float mass, inv_mass;
     float moment_of_inertia, inv_moment_of_inertia;
     struct bounds bounds;
+    struct bounds translated_bounds;
 };
 
 /**
@@ -98,6 +99,13 @@ void physics_integrate(struct phys_data *phys, float dt);
  * @param factor
  */
 void physics_scale_bounds(struct phys_data *phys, float factor);
+
+/**
+ * @brief Computes translated bounds based on angle and position of phys_data
+ *
+ * @param phys
+ */
+void physics_compute_translated_bounds(struct phys_data *phys);
 
 /**
  * @brief Checks if point is inside phys_data bounds

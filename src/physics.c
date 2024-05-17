@@ -76,12 +76,22 @@ void physics_scale_bounds(struct phys_data *phys, float factor) {
             vec2_scale(&phys->bounds.vertices[i], factor, &phys->bounds.vertices[i]);
         }
     } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
-        phys->bounds.radius *= factor;
+        phys->bounds.radius = phys->translated_bounds.radius = phys->bounds.radius * factor;
     }
 
     // now that the bounds are scaled, recompute area and inertia, also finding furthest vertex squared
     compute_area_and_inertia(phys);
     find_furthest_vertex_squared(phys);
+}
+
+void physics_compute_translated_bounds(struct phys_data *phys) {
+    if (phys->bounds.type == BOUNDS_TYPE_CIRCLE)
+        return;
+
+    for (int i = 0; i < phys->bounds.n_vertices; i++) {
+        vec2_rotate(&phys->bounds.vertices[i], phys->angle, &phys->translated_bounds.vertices[i]);
+        vec2_add(&phys->position, &phys->translated_bounds.vertices[i], &phys->translated_bounds.vertices[i]);
+    }
 }
 
 bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
@@ -173,8 +183,8 @@ void physics_integrate(struct phys_data *phys, float dt) {
 }
 
 void physics_set_bounds_circle(struct phys_data *phys, float radius) {
-    phys->bounds.type = BOUNDS_TYPE_CIRCLE;
-    phys->bounds.radius = radius;
+    phys->bounds.type = phys->translated_bounds.type = BOUNDS_TYPE_CIRCLE;
+    phys->bounds.radius = phys->translated_bounds.radius = radius;
 
     // initialize things like area and inertia now that the bounds are set
     compute_area_and_inertia(phys);
@@ -184,8 +194,8 @@ void physics_set_bounds_circle(struct phys_data *phys, float radius) {
 void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct vec2 *vertices) {
     struct vec2 *vert;
 
-    phys->bounds.type = BOUNDS_TYPE_POLY;
-    phys->bounds.n_vertices = n_vertices > MAX_POLY_SIDES ? MAX_POLY_SIDES : n_vertices;
+    phys->bounds.type = phys->translated_bounds.type = BOUNDS_TYPE_POLY;
+    phys->bounds.n_vertices = phys->translated_bounds.n_vertices = n_vertices > MAX_POLY_SIDES ? MAX_POLY_SIDES : n_vertices;
 
     for (int i = 0; i < phys->bounds.n_vertices; i++) {
         phys->bounds.vertices[i].x = vertices[i].x;
