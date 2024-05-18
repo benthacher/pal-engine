@@ -75,6 +75,7 @@ void physics_init(struct phys_data *phys, float mass) {
     phys->torque = 0.0;
     phys->bounds.area = 0.0;
     phys->mass = mass;
+    phys->elasticity = 1.0;
 }
 
 void physics_scale_bounds(struct phys_data *phys, float factor) {
@@ -367,6 +368,11 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
 
 void physics_resolve_collision(struct collision_descriptor *collision) {
     struct vec2 resolution_dist1, resolution_dist2;
+    struct vec2 collision_arm1, collision_arm2;
+    struct vec2 closing_vel1, closing_vel2;
+    struct vec2 relative_velocity;
+    struct vec2 impulse_vector;
+    struct vec2 impulse_vec1, impulse_vec2;
 
     float resolution_dist_mag = collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass);
     float resolution_dist1_mag = resolution_dist_mag * collision->phys1->inv_mass;
@@ -378,8 +384,6 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     vec2_add(&collision->phys1->position, &resolution_dist1, &collision->phys1->position);
     vec2_add(&collision->phys2->position, &resolution_dist2, &collision->phys2->position);
 
-    struct vec2 collision_arm1, collision_arm2;
-    struct vec2 closing_vel1, closing_vel2;
 
     // Closing velocity
     vec2_sub(&collision->contact, &collision->phys1->position, &collision_arm1);
@@ -400,20 +404,15 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     float collision_arm2_cross_normal = vec2_cross(&collision_arm2, &collision->normal);
     float impulse_aug2 = collision->phys2->inv_moment_of_inertia * collision_arm2_cross_normal * collision_arm2_cross_normal;
 
-    struct vec2 relative_velocity;
     vec2_sub(&closing_vel1, &closing_vel2, &relative_velocity);
 
     float separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
-    float new_separation_velocity = -separation_velocity * fmin(1.0, 1.0); // elasticities
+    float new_separation_velocity = -separation_velocity * fmin(collision->phys1->elasticity, collision->phys2->elasticity);
     float separation_velocity_diff = new_separation_velocity - separation_velocity;
-    //2. Impulse augmentation
 
     float impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
 
-    struct vec2 impulse_vector;
     vec2_scale(&collision->normal, impulse, &impulse_vector);
-
-    struct vec2 impulse_vec1, impulse_vec2;
 
     //3. Changing the velocities
     vec2_scale(&impulse_vector, collision->phys1->inv_mass, &impulse_vec1);

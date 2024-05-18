@@ -32,6 +32,7 @@ struct phys_data {
     float angle;
     float angular_velocity;
     float torque;
+    float elasticity;
     float mass, inv_mass;
     float moment_of_inertia, inv_moment_of_inertia;
     struct bounds bounds;
