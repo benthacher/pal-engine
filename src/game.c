@@ -13,6 +13,7 @@
 #include "pal.h"
 #include "mathutils.h"
 
+#define MAX_COLLISIONS 100
 struct entity_list_node {
     struct entity *entity;
     struct entity_list_node *next;
@@ -22,6 +23,8 @@ struct entity_list_node {
 static double frame_start, frame_duration;
 static bool running = false;
 static struct entity_list_node *entity_list_head = NULL;
+static struct collision_descriptor collisions[MAX_COLLISIONS];
+static size_t num_collisions = 0;
 
 static struct pointer {
     struct vec2 current_position;
@@ -84,6 +87,22 @@ void game_remove_entity(struct entity *entity) {
         node->next->prev = node->prev;
 
     free(node);
+}
+
+static void detect_and_add_collision(struct phys_data *phys1, struct phys_data *phys2) {
+    if (num_collisions == MAX_COLLISIONS)
+        return;
+
+    // check if collision has been detected
+    for (size_t i = 0; i < num_collisions; i++) {
+        if ((collisions[i].phys1 == phys1 && collisions[i].phys2 == phys2) ||
+            (collisions[i].phys1 == phys2 && collisions[i].phys2 == phys1))
+            return;
+    }
+
+    // if collision was detected, increment number of collisions so the next descriptor is filled in
+    if (physics_detect_collision(phys1, phys2, &collisions[num_collisions]))
+        num_collisions++;
 }
 
 static void emit_events() {
@@ -170,6 +189,19 @@ static void emit_events() {
         pointer.previous_time = current_time;
         pointer.previous_position_valid = true;
     }
+
+    // detect collisions
+
+    num_collisions = 0;
+
+    for (struct entity_list_node *e1 = entity_list_head; e1 != NULL; e1 = e1->next) {
+        for (struct entity_list_node *e2 = entity_list_head; e2 != NULL; e2 = e2->next) {
+            if (e1 == e2)
+                continue;
+
+            detect_and_add_collision(&e1->entity->phys, &e2->entity->phys);
+        }
+    }
 }
 
 enum button_state game_get_button(enum button button) {
@@ -194,8 +226,8 @@ static void render_all() {
 }
 
 static void update_all(float dt) {
-    for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
-        physics_compute_translated_bounds(&e->entity->phys);
+    for (size_t i = 0; i < num_collisions; i++)
+        physics_resolve_collision(&collisions[i]);
 
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
         if (e->entity->_event_handlers[ENTITY_EVENT_UPDATE])
@@ -217,6 +249,10 @@ void game_run_loop() {
 
     audio_start();
 
+    // fill in translated bounds first
+    for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
+        physics_compute_translated_bounds(&e->entity->phys);
+
     while (running) {
         // get frame start timestamp
         frame_start = pal_get_time();
@@ -227,6 +263,10 @@ void game_run_loop() {
         entity_handle_all_events();
 
         update_all(DT);
+
+        // be sure entity bounds are up to date
+        for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
+            physics_compute_translated_bounds(&e->entity->phys);
 
         // render
         render_all();

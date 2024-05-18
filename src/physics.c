@@ -21,6 +21,8 @@ static void find_furthest_vertex_squared(struct phys_data *phys) {
     } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
         phys->bounds.furthest_vertex_squared = phys->bounds.radius * phys->bounds.radius;
     }
+
+    phys->bounds.furthest_vertex_distance = sqrtf(phys->bounds.furthest_vertex_squared);
 }
 
 static void compute_area_and_inertia(struct phys_data *phys) {
@@ -283,6 +285,13 @@ static void project_phys_data(struct vec2 *axis, struct phys_data *phys, struct 
     }
 }
 
+static inline bool aabb_collision(float x1, float y1, float width1, float height1, float x2, float y2, float width2, float height2) {
+    return (x1 < x2 + width2  &&
+            x1 + width1 > x2  &&
+            y1 < y2 + height2 &&
+            y1 + height1 > y2);
+}
+
 bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision) {
     float overlap;
     struct vec2 *smallest_axis;
@@ -293,6 +302,10 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
     collision->phys1 = phys1;
     collision->phys2 = phys2;
     collision->penitration_depth = INFINITY;
+
+    if (!aabb_collision(phys1->position.x, phys1->position.y, phys1->bounds.furthest_vertex_distance * 2, phys1->bounds.furthest_vertex_distance * 2,
+                        phys2->position.x, phys2->position.y, phys2->bounds.furthest_vertex_distance * 2, phys2->bounds.furthest_vertex_distance * 2))
+        return false;
 
     get_sat_axes(phys1, phys2);
 
@@ -353,36 +366,64 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
 }
 
 void physics_resolve_collision(struct collision_descriptor *collision) {
-    // const penResolution = collision->normal.scale(collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass));
-    // collision->phys1->position.add(penResolution.copy().scale(collision->phys1->inv_mass));
-    // collision->phys2->position.add(penResolution.scale(-collision->phys2->inv_mass));
+    struct vec2 resolution_dist1, resolution_dist2;
 
-    // //1. Closing velocity
-    // const collArm1 = collision->contact.copy().subtract(collision->phys1->position);
-    // const rotVel1  = collArm1.copy().perp().scale(collision->phys1->angVel);
-    // const closVel1 = collision->phys1->vel.copy().add(rotVel1);
-    // const collArm2 = collision->contact.copy().subtract(collision->phys2->position);
-    // const rotVel2  = collArm2.copy().perp().scale(collision->phys2->angVel);
-    // const closVel2 = collision->phys2->vel.copy().add(rotVel2);
+    float resolution_dist_mag = collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass);
+    float resolution_dist1_mag = resolution_dist_mag * collision->phys1->inv_mass;
+    float resolution_dist2_mag = -resolution_dist_mag * collision->phys2->inv_mass;
 
-    // //2. Impulse augmentation
-    // const impAug1 = collision->phys1->inv_inertia * collArm1.cross(collision->normal) ** 2;
-    // const impAug2 = collision->phys2->inv_inertia * collArm2.cross(collision->normal) ** 2;
+    vec2_scale(&collision->normal, resolution_dist1_mag, &resolution_dist1);
+    vec2_scale(&collision->normal, resolution_dist2_mag, &resolution_dist2);
 
-    // const relativeVel = closVel1.subtract(closVel2);
-    // const separationVel = relativeVel.dot(collision->normal);
-    // const newSeparationVel = -separationVel * Math.min(collision->phys1->elasticity, collision->phys2->elasticity);
-    // const vsep_diff = newSeparationVel - separationVel;
+    vec2_add(&collision->phys1->position, &resolution_dist1, &collision->phys1->position);
+    vec2_add(&collision->phys2->position, &resolution_dist2, &collision->phys2->position);
 
-    // const impulse = vsep_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impAug1 + impAug2);
-    // const impulseVec = collision->normal.copy().scale(impulse);
+    struct vec2 collision_arm1, collision_arm2;
+    struct vec2 closing_vel1, closing_vel2;
 
-    // //3. Changing the velocities
-    // collision->phys1->vel.add(impulseVec.copy().scale(collision->phys1->inv_mass));
-    // collision->phys2->vel.add(impulseVec.copy().scale(-collision->phys2->inv_mass));
+    // Closing velocity
+    vec2_sub(&collision->contact, &collision->phys1->position, &collision_arm1);
+    closing_vel1.x = -collision_arm1.y;
+    closing_vel1.y = collision_arm1.x;
+    vec2_scale(&closing_vel1, collision->phys1->angular_velocity, &closing_vel1);
+    vec2_add(&collision->phys1->velocity, &closing_vel1, &closing_vel1);
 
-    // collision->phys1->angVel += collision->phys1->inv_inertia * collArm1.cross(impulseVec);
-    // collision->phys2->angVel -= collision->phys2->inv_inertia * collArm2.cross(impulseVec);
+    vec2_sub(&collision->contact, &collision->phys2->position, &collision_arm2);
+    closing_vel2.x = -collision_arm2.y;
+    closing_vel2.y = collision_arm2.x;
+    vec2_scale(&closing_vel2, collision->phys2->angular_velocity, &closing_vel2);
+    vec2_add(&collision->phys2->velocity, &closing_vel2, &closing_vel2);
+
+    // Impulse augmentation
+    float collision_arm1_cross_normal = vec2_cross(&collision_arm1, &collision->normal);
+    float impulse_aug1 = collision->phys1->inv_moment_of_inertia * collision_arm1_cross_normal * collision_arm1_cross_normal;
+    float collision_arm2_cross_normal = vec2_cross(&collision_arm2, &collision->normal);
+    float impulse_aug2 = collision->phys2->inv_moment_of_inertia * collision_arm2_cross_normal * collision_arm2_cross_normal;
+
+    struct vec2 relative_velocity;
+    vec2_sub(&closing_vel1, &closing_vel2, &relative_velocity);
+
+    float separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
+    float new_separation_velocity = -separation_velocity * fmin(1.0, 1.0); // elasticities
+    float separation_velocity_diff = new_separation_velocity - separation_velocity;
+    //2. Impulse augmentation
+
+    float impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
+
+    struct vec2 impulse_vector;
+    vec2_scale(&collision->normal, impulse, &impulse_vector);
+
+    struct vec2 impulse_vec1, impulse_vec2;
+
+    //3. Changing the velocities
+    vec2_scale(&impulse_vector, collision->phys1->inv_mass, &impulse_vec1);
+    vec2_scale(&impulse_vector, -collision->phys2->inv_mass, &impulse_vec2);
+
+    vec2_add(&collision->phys1->velocity, &impulse_vec1, &collision->phys1->velocity);
+    vec2_add(&collision->phys2->velocity, &impulse_vec2, &collision->phys2->velocity);
+
+    collision->phys1->angular_velocity += collision->phys1->inv_moment_of_inertia * vec2_cross(&collision_arm1, &impulse_vector);
+    collision->phys2->angular_velocity -= collision->phys2->inv_moment_of_inertia * vec2_cross(&collision_arm2, &impulse_vector);
 }
 
 void physics_integrate(struct phys_data *phys, float dt) {

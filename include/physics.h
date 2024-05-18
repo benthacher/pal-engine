@@ -21,6 +21,7 @@ struct bounds {
         float radius;
     };
     float furthest_vertex_squared;
+    float furthest_vertex_distance;
     float area;
 };
 
@@ -127,3 +128,10 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
  * @return false
  */
 bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision);
+
+/**
+ * @brief Resolve collision based on collision descriptor
+ *
+ * @param collision
+ */
+void physics_resolve_collision(struct collision_descriptor *collision);
