@@ -225,44 +225,32 @@ static void render_triangle(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3, s
     }
 }
 
-static void bounds_render_filled(int x, int y, struct bounds *bounds, float angle, struct color color) {
-    if (bounds->type == BOUNDS_TYPE_POLY) {
-        struct vec2 p1, p2;
-        struct vec2 center = { x, y };
-        for (int i = 0; i < bounds->n_vertices; i++) {
-            // rotate verticies
-            vec2_rotate(&bounds->vertices[i], angle, &p1);
-            vec2_rotate(&bounds->vertices[(i + 1) % bounds->n_vertices], angle, &p2);
-
-            // translate vertices to position on screen
-            vec2_add(&center, &p1, &p1);
-            vec2_add(&center, &p2, &p2);
-
-            render_triangle(&center, &p1, &p2, color);
+static void entity_render_filled(struct entity *entity) {
+    if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
+        struct vec2 *p1, *p2;
+        for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
+            p1 = &entity->phys.translated_bounds.vertices[i];
+            p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
+            // draw line from p1 to p2
+            struct vec2 center = { round(entity->phys.position.x), round(entity->phys.position.y) };
+            render_triangle(&center, p1, p2, entity->color);
         }
-    } else if (bounds->type == BOUNDS_TYPE_CIRCLE) {
-        graphics_draw_circle(x, y, bounds->radius, color);
+    } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
+        graphics_draw_circle(round(entity->phys.position.x), round(entity->phys.position.y), entity->phys.bounds.radius, entity->color);
     }
 }
 
-static void bounds_render_stroked(int x, int y, struct bounds *bounds, float angle, struct color color) {
-    if (bounds->type == BOUNDS_TYPE_POLY) {
-        struct vec2 p1, p2;
-        struct vec2 center = { x, y };
-        for (int i = 0; i < bounds->n_vertices; i++) {
-            // rotate verticies
-            vec2_rotate(&bounds->vertices[i], angle, &p1);
-            vec2_rotate(&bounds->vertices[(i + 1) % bounds->n_vertices], angle, &p2);
-
-            // translate vertices to position on screen
-            vec2_add(&center, &p1, &p1);
-            vec2_add(&center, &p2, &p2);
-
+static void entity_render_stroked(struct entity *entity) {
+    if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
+        struct vec2 *p1, *p2;
+        for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
+            p1 = &entity->phys.translated_bounds.vertices[i];
+            p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
             // draw line from p1 to p2
-            graphics_draw_line(p1.x, p1.y, p2.x, p2.y, color);
+            graphics_draw_line(round(p1->x), round(p1->y), round(p2->x), round(p2->y), entity->color);
         }
-    } else if (bounds->type == BOUNDS_TYPE_CIRCLE) {
-        graphics_stroke_circle(x, y, bounds->radius, color, 1);
+    } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
+        graphics_stroke_circle(round(entity->phys.position.x), round(entity->phys.position.y), entity->phys.bounds.radius, entity->color, 1);
     }
 }
 
@@ -275,11 +263,11 @@ void entity_render(struct entity *entity) {
     switch (entity->type) {
         case ENTITY_DRAW_TYPE_SIMPLE:
             // fill in bounds
-            bounds_render_filled(draw_x, draw_y, &entity->phys.bounds, entity->phys.angle, entity->color);
+            entity_render_filled(entity);
             break;
         case ENTITY_DRAW_TYPE_SIMPLE_OUTLINE:
             // stroke bounds
-            bounds_render_stroked(draw_x, draw_y, &entity->phys.bounds, entity->phys.angle, entity->color);
+            entity_render_stroked(entity);
             break;
         case ENTITY_DRAW_TYPE_SPRITE:
             if (entity->sprite.sprite_def == NULL)
