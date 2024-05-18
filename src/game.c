@@ -194,6 +194,9 @@ static void render_all() {
 }
 
 static void update_all(float dt) {
+    for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
+        physics_compute_translated_bounds(&e->entity->phys);
+
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
         if (e->entity->_event_handlers[ENTITY_EVENT_UPDATE])
             e->entity->_event_handlers[ENTITY_EVENT_UPDATE](e->entity, (void *) &dt);
