@@ -1,7 +1,6 @@
 #include "font.h"
 #include <stdint.h>
 #include <stddef.h>
-#include <SDL2/SDL.h>
 
 struct character {
     uint8_t bitmap[9];
@@ -1441,9 +1440,9 @@ static void draw_char(int x, int y, const struct character *c, bool invert_color
             if (b & c->bitmap[r]) {
                 draw_color.r = draw_color.g = draw_color.b = invert_color ? 0x00 : 0xff;
                 draw_x = x;
-                draw_y = 128 - (y - c->height + r);
+                draw_y = (y - c->height + r);
 
-                pal_screen_draw_pixel(x, y, draw_color);
+                pal_screen_draw_pixel(draw_x, draw_y, draw_color);
             }
         }
 
