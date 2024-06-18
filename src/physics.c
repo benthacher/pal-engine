@@ -304,8 +304,8 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
     collision->phys2 = phys2;
     collision->penitration_depth = INFINITY;
 
-    if (!aabb_collision(phys1->position.x, phys1->position.y, phys1->bounds.furthest_vertex_distance * 2, phys1->bounds.furthest_vertex_distance * 2,
-                        phys2->position.x, phys2->position.y, phys2->bounds.furthest_vertex_distance * 2, phys2->bounds.furthest_vertex_distance * 2))
+    if (!aabb_collision(phys1->position.x - phys1->bounds.furthest_vertex_distance, phys1->position.y - phys1->bounds.furthest_vertex_distance, phys1->bounds.furthest_vertex_distance * 2, phys1->bounds.furthest_vertex_distance * 2,
+                        phys2->position.x - phys2->bounds.furthest_vertex_distance, phys2->position.y - phys2->bounds.furthest_vertex_distance, phys2->bounds.furthest_vertex_distance * 2, phys2->bounds.furthest_vertex_distance * 2))
         return false;
 
     get_sat_axes(phys1, phys2);
@@ -362,11 +362,15 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
 
     collision->normal = *smallest_axis;
     collision->contact = contact_vertex.collision_point;
+    collision->should_resolve = true;
 
     return true;
 }
 
 void physics_resolve_collision(struct collision_descriptor *collision) {
+    if (!collision->should_resolve)
+        return;
+
     struct vec2 resolution_dist1, resolution_dist2;
     struct vec2 collision_arm1, collision_arm2;
     struct vec2 closing_vel1, closing_vel2;

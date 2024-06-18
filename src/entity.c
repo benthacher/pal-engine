@@ -13,7 +13,8 @@
 // every uninitialized entity event is zero, meaning no event data is used
 static size_t event_data_lengths[NUM_ENTITY_EVENTS] = {
     [ENTITY_EVENT_BUTTON_UP] = sizeof(enum button),
-    [ENTITY_EVENT_BUTTON_DOWN] = sizeof(enum button)
+    [ENTITY_EVENT_BUTTON_DOWN] = sizeof(enum button),
+    [ENTITY_EVENT_COLLISION] = sizeof(struct collision_descriptor *),
 };
 
 const char *entity_event_str(enum entity_event event) {
@@ -26,6 +27,7 @@ const char *entity_event_str(enum entity_event event) {
         case ENTITY_EVENT_SPRITE_LOOP_END: return "ENTITY_EVENT_SPRITE_LOOP_END";
         case ENTITY_EVENT_BUTTON_UP: return "ENTITY_EVENT_BUTTON_UP";
         case ENTITY_EVENT_BUTTON_DOWN: return "ENTITY_EVENT_BUTTON_DOWN";
+        case ENTITY_EVENT_COLLISION: return "ENTITY_EVENT_COLLISION";
         default: return "Unknown Event";
     }
 }

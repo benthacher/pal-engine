@@ -70,16 +70,10 @@ void game_add_entity(struct entity *entity) {
 }
 
 void game_remove_entity(struct entity *entity) {
-    struct entity_list_node *node = entity_list_head;
+    entity_state_set(entity, ENTITY_STATE_SHOULD_BE_REMOVED);
+}
 
-    while (node != NULL && node->entity != entity) {
-        node = node->next;
-    }
-
-    // node not found
-    if (node == NULL)
-        return;
-
+static void remove_entity_node_from_list(struct entity_list_node *node) {
     if (node->prev != NULL)
         node->prev->next = node->next;
 
@@ -89,20 +83,29 @@ void game_remove_entity(struct entity *entity) {
     free(node);
 }
 
-static void detect_and_add_collision(struct phys_data *phys1, struct phys_data *phys2) {
+static void detect_and_add_collision(struct entity *entity1, struct entity *entity2) {
     if (num_collisions == MAX_COLLISIONS)
+        return;
+
+    if (!entity_state_check(entity1, ENTITY_STATE_DO_COLLISIONS) || !entity_state_check(entity2, ENTITY_STATE_DO_COLLISIONS))
         return;
 
     // check if collision has been detected
     for (size_t i = 0; i < num_collisions; i++) {
-        if ((collisions[i].phys1 == phys1 && collisions[i].phys2 == phys2) ||
-            (collisions[i].phys1 == phys2 && collisions[i].phys2 == phys1))
+        if ((collisions[i].phys1 == &entity1->phys && collisions[i].phys2 == &entity2->phys) ||
+            (collisions[i].phys1 == &entity2->phys && collisions[i].phys2 == &entity1->phys))
             return;
     }
 
     // if collision was detected, increment number of collisions so the next descriptor is filled in
-    if (physics_detect_collision(phys1, phys2, &collisions[num_collisions]))
+    if (physics_detect_collision(&entity1->phys, &entity2->phys, &collisions[num_collisions])) {
+        // send pointer to descriptor to both entities involved
+        struct collision_descriptor *desc = &collisions[num_collisions];
+
+        entity_event_emit(entity1, ENTITY_EVENT_COLLISION, (void *) &desc, sizeof(struct collision_descriptor *));
+        entity_event_emit(entity2, ENTITY_EVENT_COLLISION, (void *) &desc, sizeof(struct collision_descriptor *));
         num_collisions++;
+    }
 }
 
 static void emit_events() {
@@ -199,7 +202,7 @@ static void emit_events() {
             if (e1 == e2)
                 continue;
 
-            detect_and_add_collision(&e1->entity->phys, &e2->entity->phys);
+            detect_and_add_collision(e1->entity, e2->entity);
         }
     }
 }
@@ -236,6 +239,19 @@ static void update_all(float dt) {
         if (entity_state_check(e->entity, ENTITY_STATE_DO_PHYSICS))
             physics_integrate(&e->entity->phys, dt);
     }
+
+    bool check_for_more = false;
+
+    do {
+        check_for_more = false;
+        for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
+            if (entity_state_check(e->entity, ENTITY_STATE_SHOULD_BE_REMOVED)) {
+                remove_entity_node_from_list(e);
+                check_for_more = true;
+                break;
+            }
+        }
+    } while (check_for_more);
 }
 
 void entity_handle_all_events() {

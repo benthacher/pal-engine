@@ -44,10 +44,11 @@ struct phys_data {
  *
  */
 struct collision_descriptor {
+    bool should_resolve;
+    float penitration_depth;
     struct phys_data *phys1;
     struct phys_data *phys2;
     struct vec2 normal;
-    float penitration_depth;
     struct vec2 contact;
 };
 
