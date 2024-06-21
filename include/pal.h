@@ -17,7 +17,7 @@
 #include <stdbool.h>
 
 // Set this flag in the CMakeLists.txt file depending on the desired platform precision
-#if defined PAL_USE_FLOAT32 && PAL_USE_FLOAT32 == 1
+#if defined PAL_USE_FLOAT32
 typedef float pal_float_t;
 #else
 typedef double pal_float_t;

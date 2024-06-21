@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.29)
 project(pal_engine)
 
+add_library(pal_platform_defs INTERFACE)
+
+if("${PAL_USE_FLOAT32}" STREQUAL "1")
+    message(STATUS "Using single precision floats")
+    # Make sure floating point constants are floats
+    target_compile_options(pal_platform_defs INTERFACE -fsingle-precision-constant)
+    target_compile_definitions(pal_platform_defs INTERFACE PAL_USE_FLOAT32)
+else()
+    message(STATUS "Using double precision floats")
+endif()
+
 if("${PAL_BACKEND_SOURCES}" STREQUAL "")
     message(FATAL_ERROR "PAL Backend not set! Before including PAL as a subdirectory, make sure to set the PAL_BACKEND_SOURCES variable to the source that implements PAL functions.")
 endif()
@@ -37,12 +48,4 @@ add_dependencies(pal_engine generated_midi_files generated_sprite_files)
 
 target_include_directories(pal_engine PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/include ${PAL_BACKEND_INCLUDES})
 
-target_link_libraries(pal_engine m ${PAL_BACKEND_LIBRARIES})
-
-if("${PAL_USE_FLOAT32}" STREQUAL "1")
-    message(STATUS "Using single precision floats")
-    # Make sure floating point constants are floats
-    target_compile_options(pal_engine PRIVATE -fsingle-precision-constant)
-else()
-    message(STATUS "Using double precision floats")
-endif()
+target_link_libraries(pal_engine pal_platform_defs m ${PAL_BACKEND_LIBRARIES})
