@@ -1,3 +1,4 @@
 [submodule "pal-engine-base"]
 	path = pal-engine-base
 	url = git@github.com:benthacher/pal-engine-base.git
+	branch = main
