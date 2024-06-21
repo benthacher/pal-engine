@@ -40,14 +40,14 @@ void graphics_draw_rect(int x, int y, int width, int height, struct color c) {
     }
 }
 
-void graphics_draw_circle(int x, int y, float radius, struct color c) {
+void graphics_draw_circle(int x, int y, pal_float_t radius, struct color c) {
     int start_x = fmax(x - radius, 0);
     int start_y = fmax(y - radius, 0);
     int end_x =   fmin(x + radius, PAL_SCREEN_WIDTH - 1);
     int end_y =   fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
     int draw_x;
     int draw_y;
-    float dist;
+    pal_float_t dist;
 
     for (draw_y = start_y; draw_y <= end_y; draw_y++) {
         for (draw_x = start_x; draw_x <= end_x; draw_x++) {
@@ -59,14 +59,14 @@ void graphics_draw_circle(int x, int y, float radius, struct color c) {
     }
 }
 
-void graphics_stroke_circle(int x, int y, float radius, struct color c, float stroke_width) {
+void graphics_stroke_circle(int x, int y, pal_float_t radius, struct color c, pal_float_t stroke_width) {
     int start_x = fmax(x - radius, 0);
     int start_y = fmax(y - radius, 0);
     int end_x =   fmin(x + radius, PAL_SCREEN_WIDTH - 1);
     int end_y =   fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
     int draw_x;
     int draw_y;
-    float dist;
+    pal_float_t dist;
 
     for (draw_y = start_y; draw_y <= end_y; draw_y++) {
         for (draw_x = start_x; draw_x <= end_x; draw_x++) {
@@ -166,9 +166,9 @@ void graphics_draw_transformed_image(struct image *image, int x, int y, struct m
     }
 }
 
-void graphics_draw_image(struct image *image, int x, int y, float angle, float scale) {
-    float cos_angle = pal_cos(angle);
-    float sin_angle = pal_sin(angle);
+void graphics_draw_image(struct image *image, int x, int y, pal_float_t angle, pal_float_t scale) {
+    pal_float_t cos_angle = pal_cos(angle);
+    pal_float_t sin_angle = pal_sin(angle);
 
     struct mat2 m = {
         cos_angle * scale, -sin_angle * scale,

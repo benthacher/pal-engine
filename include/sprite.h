@@ -8,7 +8,7 @@
 
 struct sprite_frame {
     struct image *image;
-    double duration;
+    pal_float_t duration;
 };
 
 /**
@@ -25,8 +25,8 @@ struct sprite {
     bool finished;
     size_t current_frame;
     struct sprite_def *sprite_def;
-    double frame_elapsed_time;
-    double previous_time;
+    pal_float_t frame_elapsed_time;
+    pal_float_t previous_time;
 };
 
 /**
@@ -52,4 +52,4 @@ void sprite_update(struct sprite *sprite);
  * @param angle
  * @param scale
  */
-void sprite_draw(struct sprite *sprite, int x, int y, float angle, float scale);
+void sprite_draw(struct sprite *sprite, int x, int y, pal_float_t angle, pal_float_t scale);

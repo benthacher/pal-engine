@@ -16,7 +16,7 @@
 #define TRACK_PRINT(track_num, fmt, ...)
 #endif
 
-static const float SMPTE_frames_per_second_map[] = {
+static const pal_float_t SMPTE_frames_per_second_map[] = {
     [MIDI_SMPTE_24] =    24.0f,
     [MIDI_SMPTE_25] =    25.0f,
     [MIDI_SMPTE_29_97] = 29.97f,
@@ -24,7 +24,7 @@ static const float SMPTE_frames_per_second_map[] = {
 };
 
 // note frequency lookup table
-static const float note_frequencies[] = {
+static const pal_float_t note_frequencies[] = {
     [127] = 12543.85,
     [126] = 11839.82,
     [125] = 11175.30,
@@ -199,7 +199,7 @@ static inline char *status_string(enum midi_status_code status_code) {
     }
 }
 
-float midi_parser_note_frequency(uint8_t note_number) {
+pal_float_t midi_parser_note_frequency(uint8_t note_number) {
     return note_frequencies[note_number];
 }
 

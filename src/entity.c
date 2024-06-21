@@ -41,7 +41,7 @@ void entity_set_sprite_def(struct entity *entity, struct sprite_def *sprite_def)
     sprite_init(&entity->sprite, sprite_def);
 }
 
-void entity_init(struct entity *entity, float mass) {
+void entity_init(struct entity *entity, pal_float_t mass) {
     // make sure event handlers are null
     for (int i = 0; i < NUM_ENTITY_EVENTS; i++) {
         entity->_event_handlers[i] = NULL;
@@ -118,13 +118,13 @@ void entity_set_bounds(struct entity *entity, enum entity_bounds_type type, ...)
             }
             break;
         case ENTITY_BOUNDS_TYPE_CIRCLE: {
-            double radius = va_arg(bounds_args, double);
+            pal_float_t radius = (pal_float_t) va_arg(bounds_args, double);
             physics_set_bounds_circle(&entity->phys, radius);
             break;
         }
         case ENTITY_BOUNDS_TYPE_RECTANGLE:
-            double width = va_arg(bounds_args, double);
-            double height = va_arg(bounds_args, double);
+            pal_float_t width = (pal_float_t) va_arg(bounds_args, double);
+            pal_float_t height = (pal_float_t) va_arg(bounds_args, double);
             physics_set_bounds_rect(&entity->phys, width, height);
             break;
     }
@@ -201,7 +201,7 @@ bool entity_state_check(struct entity *entity, enum entity_state state) {
     return (entity->_state_flags & (1 << state)) ? true : false;
 }
 
-void entity_scale(struct entity *entity, float factor) {
+void entity_scale(struct entity *entity, pal_float_t factor) {
     if (entity->type == ENTITY_DRAW_TYPE_SPRITE) {
         entity->scale *= factor;
     }

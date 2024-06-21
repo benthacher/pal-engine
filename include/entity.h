@@ -73,7 +73,7 @@ struct entity {
         struct color color;
         struct {
             struct sprite sprite;
-            float scale;
+            pal_float_t scale;
         };
     };
 
@@ -90,7 +90,7 @@ struct entity {
  * @param entity pointer to entity
  * @param mass mass
  */
-void entity_init(struct entity *entity, float mass);
+void entity_init(struct entity *entity, pal_float_t mass);
 
 /**
  * @brief Scales entity's bounds by given factor
@@ -98,7 +98,7 @@ void entity_init(struct entity *entity, float mass);
  * @param entity
  * @param factor
  */
-void entity_scale(struct entity *entity, float factor);
+void entity_scale(struct entity *entity, pal_float_t factor);
 
 /**
  * @brief Sets draw type of entity.
@@ -117,9 +117,9 @@ void entity_set_draw_type(struct entity *entity, enum entity_draw_type type, ...
 /**
  * @brief Sets bounds of entity.
  * Depending on draw type, the argument after type MUST be of the following type:
-        ENTITY_BOUNDS_TYPE_CIRCLE:    (float) radius
+        ENTITY_BOUNDS_TYPE_CIRCLE:    (pal_float_t) radius
         ENTITY_BOUNDS_TYPE_POLY:      (size_t) n_vertices, (struct vec2 *) vertices
-        ENTITY_BOUNDS_TYPE_RECTANGLE: (float) width, (float) height
+        ENTITY_BOUNDS_TYPE_RECTANGLE: (pal_float_t) width, (pal_float_t) height
  *
  * @param entity
  * @param type
