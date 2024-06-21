@@ -14,7 +14,7 @@ void vec2_lerp(struct vec2 *v1, struct vec2 *v2, pal_float_t t, struct vec2 *v_o
 }
 
 pal_float_t vec2_mag(struct vec2 *v) {
-    return hypotf(v->x, v->y);
+    return pal_hypot(v->x, v->y);
 }
 
 pal_float_t vec2_squared_mag(struct vec2 *v) {
@@ -22,7 +22,7 @@ pal_float_t vec2_squared_mag(struct vec2 *v) {
 }
 
 pal_float_t vec2_dir(struct vec2 *v) {
-    return atan2f(v->y, v->x);
+    return pal_atan2(v->y, v->x);
 }
 
 void vec2_set_mag(struct vec2 *v, pal_float_t mag, struct vec2 *v_out) {
@@ -101,4 +101,16 @@ bool mat2_inv(struct mat2 *m, struct mat2 *m_inv) {
     m_inv->d =  det_inv * m->a;
 
     return true;
+}
+
+pal_float_t rand_float() {
+    return pal_rand() / ((pal_float_t) PAL_RAND_MAX + 1);
+}
+
+pal_float_t rand_float_range(pal_float_t min, pal_float_t max) {
+    return pal_rand() / (((pal_float_t) PAL_RAND_MAX + 1) / (max - min)) + min;
+}
+
+int rand_range(int min, int max) {
+    return pal_rand() % (max - min) + min;
 }

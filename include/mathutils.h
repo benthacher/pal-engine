@@ -149,5 +149,34 @@ pal_float_t mat2_det(struct mat2 *m);
  *
  * @param m
  * @param m_inv
+ * @return bool true if matrix is able to be inverted and false if not
  */
 bool mat2_inv(struct mat2 *m, struct mat2 *m_inv);
+
+/**
+ * @brief Returns random number in range [0, 1)
+ * (not including 1)
+ *
+ * @return pal_float_t
+ */
+pal_float_t rand_float();
+
+/**
+ * @brief Returns random number in range [min, max)
+ * (not including max)
+ *
+ * @param min
+ * @param max
+ * @return pal_float_t
+ */
+pal_float_t rand_float_range(pal_float_t min, pal_float_t max);
+
+/**
+ * @brief Returns random integer in range [min, max)
+ * (not including max)
+ *
+ * @param min
+ * @param max
+ * @return int
+ */
+int rand_range(int min, int max);
