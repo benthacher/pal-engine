@@ -2,6 +2,11 @@
 #include <math.h>
 #include <stdlib.h>
 
+// normalized collision axes used in SAT algorithm. Maximum number of axes happens when two polygons with max sides collide
+static struct vec2 collision_axes[MAX_POLY_SIDES * 2];
+static int num_phys1_collision_axes;
+static int num_phys2_collision_axes;
+
 static void find_furthest_vertex_squared(struct phys_data *phys) {
     if (phys->bounds.type == BOUNDS_TYPE_POLY) {
         float dist_squared;
@@ -16,6 +21,8 @@ static void find_furthest_vertex_squared(struct phys_data *phys) {
     } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
         phys->bounds.furthest_vertex_squared = phys->bounds.radius * phys->bounds.radius;
     }
+
+    phys->bounds.furthest_vertex_distance = sqrtf(phys->bounds.furthest_vertex_squared);
 }
 
 static void compute_area_and_inertia(struct phys_data *phys) {
@@ -68,6 +75,7 @@ void physics_init(struct phys_data *phys, float mass) {
     phys->torque = 0.0;
     phys->bounds.area = 0.0;
     phys->mass = mass;
+    phys->elasticity = 1.0;
 }
 
 void physics_scale_bounds(struct phys_data *phys, float factor) {
@@ -76,12 +84,22 @@ void physics_scale_bounds(struct phys_data *phys, float factor) {
             vec2_scale(&phys->bounds.vertices[i], factor, &phys->bounds.vertices[i]);
         }
     } else if (phys->bounds.type == BOUNDS_TYPE_CIRCLE) {
-        phys->bounds.radius *= factor;
+        phys->bounds.radius = phys->translated_bounds.radius = phys->bounds.radius * factor;
     }
 
     // now that the bounds are scaled, recompute area and inertia, also finding furthest vertex squared
     compute_area_and_inertia(phys);
     find_furthest_vertex_squared(phys);
+}
+
+void physics_compute_translated_bounds(struct phys_data *phys) {
+    if (phys->bounds.type == BOUNDS_TYPE_CIRCLE)
+        return;
+
+    for (int i = 0; i < phys->bounds.n_vertices; i++) {
+        vec2_rotate(&phys->bounds.vertices[i], phys->angle, &phys->translated_bounds.vertices[i]);
+        vec2_add(&phys->position, &phys->translated_bounds.vertices[i], &phys->translated_bounds.vertices[i]);
+    }
 }
 
 bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
@@ -97,12 +115,9 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
         int pos = 0;
         int neg = 0;
 
-        for (int i = 0; i < phys->bounds.n_vertices; i++) {
-            vec2_add(&phys->position, &phys->bounds.vertices[i], &p1);
-            vec2_add(&phys->position, &phys->bounds.vertices[(i + 1) % phys->bounds.n_vertices], &p2);
-
-            vec2_sub(point, &p1, &p3);
-            vec2_sub(&p2, &p1, &p2);
+        for (int i = 0; i < phys->translated_bounds.n_vertices; i++) {
+            vec2_sub(point, &phys->translated_bounds.vertices[i], &p3);
+            vec2_sub(&phys->translated_bounds.vertices[(i + 1) % phys->bounds.n_vertices], &phys->translated_bounds.vertices[i], &p2);
 
             float d = vec2_cross(&p3, &p2);
 
@@ -122,37 +137,296 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
     }
 }
 
-void physics_resolve_collision(struct collision_manifold *collision) {
-    // const penResolution = collision->normal.scale(collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass));
-    // collision->phys1->position.add(penResolution.copy().scale(collision->phys1->inv_mass));
-    // collision->phys2->position.add(penResolution.scale(-collision->phys2->inv_mass));
+static void closest_vertex_to_point(struct phys_data *phys, struct vec2 *point, struct vec2 *closest) {
+    struct vec2 *closest_ptr = &phys->translated_bounds.vertices[0];
+    struct vec2 distance_vector;
+    float distance;
+    float min = INFINITY;
 
-    // //1. Closing velocity
-    // const collArm1 = collision->contact.copy().subtract(collision->phys1->position);
-    // const rotVel1  = collArm1.copy().perp().scale(collision->phys1->angVel);
-    // const closVel1 = collision->phys1->vel.copy().add(rotVel1);
-    // const collArm2 = collision->contact.copy().subtract(collision->phys2->position);
-    // const rotVel2  = collArm2.copy().perp().scale(collision->phys2->angVel);
-    // const closVel2 = collision->phys2->vel.copy().add(rotVel2);
+    for (int i = 0; i < phys->translated_bounds.n_vertices; i++) {
+        vec2_sub(&phys->translated_bounds.vertices[i], point, &distance_vector);
+        distance = vec2_squared_mag(&distance_vector);
+        if (distance < min) {
+            closest_ptr = &phys->translated_bounds.vertices[i];
+            min = distance;
+        }
+    }
 
-    // //2. Impulse augmentation
-    // const impAug1 = collision->phys1->inv_inertia * collArm1.cross(collision->normal) ** 2;
-    // const impAug2 = collision->phys2->inv_inertia * collArm2.cross(collision->normal) ** 2;
+    *closest = *closest_ptr;
+}
 
-    // const relativeVel = closVel1.subtract(closVel2);
-    // const separationVel = relativeVel.dot(collision->normal);
-    // const newSeparationVel = -separationVel * Math.min(collision->phys1->elasticity, collision->phys2->elasticity);
-    // const vsep_diff = newSeparationVel - separationVel;
+static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
+    num_phys1_collision_axes = num_phys2_collision_axes = 0;
+    struct vec2 *axis;
 
-    // const impulse = vsep_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impAug1 + impAug2);
-    // const impulseVec = collision->normal.copy().scale(impulse);
+    // If both phys_datas are circles, we just need the normalized difference vector as an axis
+    if (phys1->translated_bounds.type == BOUNDS_TYPE_CIRCLE && phys2->translated_bounds.type == BOUNDS_TYPE_CIRCLE) {
+        vec2_sub(&phys2->position, &phys1->position, &collision_axes[0]);
+        vec2_normalize(&collision_axes[0], &collision_axes[0]);
+        num_phys1_collision_axes = 1;
+    // If phys1 is a circle, get the closest point of phys2's translated_bounds and get an axis from it
+    // From phys2's normal_angles, make a set of normal vectors and add them to axes
+    } else if (phys1->translated_bounds.type == BOUNDS_TYPE_CIRCLE) {
+        // axis from closest point of phys2's translated_bounds to phys1
+        axis = &collision_axes[0];
+        closest_vertex_to_point(phys2, &phys1->position, axis);
+        vec2_sub(axis, &phys1->position, axis);
+        vec2_normalize(axis, axis);
+        num_phys1_collision_axes = 1;
 
-    // //3. Changing the velocities
-    // collision->phys1->vel.add(impulseVec.copy().scale(collision->phys1->inv_mass));
-    // collision->phys2->vel.add(impulseVec.copy().scale(-collision->phys2->inv_mass));
+        for (int i = 0; i < phys2->translated_bounds.n_vertices; i++) {
+            // get edge
+            struct vec2 *v1 = &phys2->translated_bounds.vertices[i];
+            struct vec2 *v2 = &phys2->translated_bounds.vertices[(i + 1) % phys2->translated_bounds.n_vertices];
+            axis = &collision_axes[num_phys1_collision_axes + num_phys2_collision_axes];
 
-    // collision->phys1->angVel += collision->phys1->inv_inertia * collArm1.cross(impulseVec);
-    // collision->phys2->angVel -= collision->phys2->inv_inertia * collArm2.cross(impulseVec);
+            // axis = v1 - v2
+            vec2_sub(v1, v2, axis);
+            vec2_normalize(axis, axis);
+            // get vector normal to axis
+            float axis_x = axis->x;
+            axis->x = -axis->y;
+            axis->y = axis_x;
+
+            num_phys2_collision_axes++;
+        }
+    } else if (phys2->translated_bounds.type == BOUNDS_TYPE_CIRCLE) {
+        for (int i = 0; i < phys1->translated_bounds.n_vertices; i++) {
+            // get edge
+            struct vec2 *v1 = &phys1->translated_bounds.vertices[i];
+            struct vec2 *v2 = &phys1->translated_bounds.vertices[(i + 1) % phys1->translated_bounds.n_vertices];
+            axis = &collision_axes[num_phys1_collision_axes];
+
+            // axis = v1 - v2
+            vec2_sub(v1, v2, axis);
+            vec2_normalize(axis, axis);
+            // get vector normal to axis
+            float axis_x = axis->x;
+            axis->x = -axis->y;
+            axis->y = axis_x;
+
+            num_phys1_collision_axes++;
+        }
+
+        // axis from closest point of phys2's translated_bounds to phys1
+        axis = &collision_axes[num_phys1_collision_axes];
+        closest_vertex_to_point(phys1, &phys2->position, axis);
+        vec2_sub(axis, &phys2->position, axis);
+        vec2_normalize(axis, axis);
+        num_phys2_collision_axes = 1;
+    } else { // both objects are polys
+        for (int i = 0; i < phys1->translated_bounds.n_vertices; i++) {
+            // get edge
+            struct vec2 *v1 = &phys1->translated_bounds.vertices[i];
+            struct vec2 *v2 = &phys1->translated_bounds.vertices[(i + 1) % phys1->translated_bounds.n_vertices];
+            axis = &collision_axes[num_phys1_collision_axes];
+
+            // axis = v1 - v2
+            vec2_sub(v1, v2, axis);
+            vec2_normalize(axis, axis);
+            // get vector normal to axis
+            float axis_x = axis->x;
+            axis->x = -axis->y;
+            axis->y = axis_x;
+
+            num_phys1_collision_axes++;
+        }
+        for (int i = 0; i < phys2->translated_bounds.n_vertices; i++) {
+            // get edge
+            struct vec2 *v1 = &phys2->translated_bounds.vertices[i];
+            struct vec2 *v2 = &phys2->translated_bounds.vertices[(i + 1) % phys2->translated_bounds.n_vertices];
+            axis = &collision_axes[num_phys1_collision_axes + num_phys2_collision_axes];
+
+            // axis = v1 - v2
+            vec2_sub(v1, v2, axis);
+            vec2_normalize(axis, axis);
+            // get vector normal to axis
+            float axis_x = axis->x;
+            axis->x = -axis->y;
+            axis->y = axis_x;
+
+            num_phys2_collision_axes++;
+        }
+    }
+}
+
+struct projection {
+    float min;
+    float max;
+    struct vec2 collision_point;
+};
+
+static void project_phys_data(struct vec2 *axis, struct phys_data *phys, struct projection *projection) {
+    float proj;
+
+    if (phys->translated_bounds.type == BOUNDS_TYPE_CIRCLE) {
+        float r = phys->translated_bounds.radius;
+        float pos_proj = vec2_dot(axis, &phys->position);
+
+        projection->min = pos_proj - r;
+        projection->max = pos_proj + r;
+        vec2_scale(axis, -r, &projection->collision_point);
+        vec2_add(&phys->position, &projection->collision_point, &projection->collision_point);
+    } else {
+        projection->min = vec2_dot(axis, &phys->translated_bounds.vertices[0]);
+        projection->max = projection->min;
+        projection->collision_point = phys->translated_bounds.vertices[0];
+
+        for (int i = 1; i < phys->translated_bounds.n_vertices; i++) {
+            proj = vec2_dot(axis, &phys->translated_bounds.vertices[i]);
+
+            if (proj < projection->min) {
+                projection->min = proj;
+                projection->collision_point = phys->translated_bounds.vertices[i];
+            }
+
+            if (proj > projection->max)
+                projection->max = proj;
+        }
+    }
+}
+
+static inline bool aabb_collision(float x1, float y1, float width1, float height1, float x2, float y2, float width2, float height2) {
+    return (x1 < x2 + width2  &&
+            x1 + width1 > x2  &&
+            y1 < y2 + height2 &&
+            y1 + height1 > y2);
+}
+
+bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision) {
+    float overlap;
+    struct vec2 *smallest_axis;
+    struct vec2 *axis;
+    struct phys_data *vertex_obj;
+    struct projection proj1, proj2, contact_vertex;
+
+    collision->phys1 = phys1;
+    collision->phys2 = phys2;
+    collision->penitration_depth = INFINITY;
+
+    if (!aabb_collision(phys1->position.x - phys1->bounds.furthest_vertex_distance, phys1->position.y - phys1->bounds.furthest_vertex_distance, phys1->bounds.furthest_vertex_distance * 2, phys1->bounds.furthest_vertex_distance * 2,
+                        phys2->position.x - phys2->bounds.furthest_vertex_distance, phys2->position.y - phys2->bounds.furthest_vertex_distance, phys2->bounds.furthest_vertex_distance * 2, phys2->bounds.furthest_vertex_distance * 2))
+        return false;
+
+    get_sat_axes(phys1, phys2);
+
+    for (int i = 0; i < num_phys1_collision_axes + num_phys2_collision_axes; i++) {
+        axis = &collision_axes[i];
+
+        project_phys_data(axis, phys1, &proj1);
+        project_phys_data(axis, phys2, &proj2);
+
+        overlap = fmin(proj1.max, proj2.max) - fmax(proj1.min, proj2.min);
+
+        if (overlap < 0)
+            return false;
+
+        if ((proj1.max > proj2.max && proj1.min < proj2.min) ||
+            (proj1.max < proj2.max && proj1.min > proj2.min)) {
+
+            float mins = fabs(proj1.min - proj2.min);
+            float maxs = fabs(proj1.max - proj2.max);
+
+            if (mins < maxs) {
+                overlap += mins;
+            } else {
+                overlap += maxs;
+                vec2_scale(axis, -1, axis);
+            }
+        }
+
+        if (overlap < collision->penitration_depth) {
+            collision->penitration_depth = overlap;
+            smallest_axis = axis;
+
+            if (i < num_phys1_collision_axes) {
+                vertex_obj = phys2;
+                if (proj1.max > proj2.max) {
+                    vec2_scale(axis, -1, axis);
+                    smallest_axis = axis;
+                }
+            } else {
+                vertex_obj = phys1;
+                if (proj1.max < proj2.max) {
+                    vec2_scale(axis, -1, axis);
+                    smallest_axis = axis;
+                }
+            }
+        }
+    }
+
+    project_phys_data(smallest_axis, vertex_obj, &contact_vertex);
+
+    if (vertex_obj == phys2)
+        vec2_scale(smallest_axis, -1, smallest_axis);
+
+    collision->normal = *smallest_axis;
+    collision->contact = contact_vertex.collision_point;
+    collision->should_resolve = true;
+
+    return true;
+}
+
+void physics_resolve_collision(struct collision_descriptor *collision) {
+    if (!collision->should_resolve)
+        return;
+
+    struct vec2 resolution_dist1, resolution_dist2;
+    struct vec2 collision_arm1, collision_arm2;
+    struct vec2 closing_vel1, closing_vel2;
+    struct vec2 relative_velocity;
+    struct vec2 impulse_vector;
+    struct vec2 impulse_vec1, impulse_vec2;
+
+    float resolution_dist_mag = collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass);
+    float resolution_dist1_mag = resolution_dist_mag * collision->phys1->inv_mass;
+    float resolution_dist2_mag = -resolution_dist_mag * collision->phys2->inv_mass;
+
+    vec2_scale(&collision->normal, resolution_dist1_mag, &resolution_dist1);
+    vec2_scale(&collision->normal, resolution_dist2_mag, &resolution_dist2);
+
+    vec2_add(&collision->phys1->position, &resolution_dist1, &collision->phys1->position);
+    vec2_add(&collision->phys2->position, &resolution_dist2, &collision->phys2->position);
+
+
+    // Closing velocity
+    vec2_sub(&collision->contact, &collision->phys1->position, &collision_arm1);
+    closing_vel1.x = -collision_arm1.y;
+    closing_vel1.y = collision_arm1.x;
+    vec2_scale(&closing_vel1, collision->phys1->angular_velocity, &closing_vel1);
+    vec2_add(&collision->phys1->velocity, &closing_vel1, &closing_vel1);
+
+    vec2_sub(&collision->contact, &collision->phys2->position, &collision_arm2);
+    closing_vel2.x = -collision_arm2.y;
+    closing_vel2.y = collision_arm2.x;
+    vec2_scale(&closing_vel2, collision->phys2->angular_velocity, &closing_vel2);
+    vec2_add(&collision->phys2->velocity, &closing_vel2, &closing_vel2);
+
+    // Impulse augmentation
+    float collision_arm1_cross_normal = vec2_cross(&collision_arm1, &collision->normal);
+    float impulse_aug1 = collision->phys1->inv_moment_of_inertia * collision_arm1_cross_normal * collision_arm1_cross_normal;
+    float collision_arm2_cross_normal = vec2_cross(&collision_arm2, &collision->normal);
+    float impulse_aug2 = collision->phys2->inv_moment_of_inertia * collision_arm2_cross_normal * collision_arm2_cross_normal;
+
+    vec2_sub(&closing_vel1, &closing_vel2, &relative_velocity);
+
+    float separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
+    float new_separation_velocity = -separation_velocity * fmin(collision->phys1->elasticity, collision->phys2->elasticity);
+    float separation_velocity_diff = new_separation_velocity - separation_velocity;
+
+    float impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
+
+    vec2_scale(&collision->normal, impulse, &impulse_vector);
+
+    //3. Changing the velocities
+    vec2_scale(&impulse_vector, collision->phys1->inv_mass, &impulse_vec1);
+    vec2_scale(&impulse_vector, -collision->phys2->inv_mass, &impulse_vec2);
+
+    vec2_add(&collision->phys1->velocity, &impulse_vec1, &collision->phys1->velocity);
+    vec2_add(&collision->phys2->velocity, &impulse_vec2, &collision->phys2->velocity);
+
+    collision->phys1->angular_velocity += collision->phys1->inv_moment_of_inertia * vec2_cross(&collision_arm1, &impulse_vector);
+    collision->phys2->angular_velocity -= collision->phys2->inv_moment_of_inertia * vec2_cross(&collision_arm2, &impulse_vector);
 }
 
 void physics_integrate(struct phys_data *phys, float dt) {
@@ -169,8 +443,8 @@ void physics_integrate(struct phys_data *phys, float dt) {
 }
 
 void physics_set_bounds_circle(struct phys_data *phys, float radius) {
-    phys->bounds.type = BOUNDS_TYPE_CIRCLE;
-    phys->bounds.radius = radius;
+    phys->bounds.type = phys->translated_bounds.type = BOUNDS_TYPE_CIRCLE;
+    phys->bounds.radius = phys->translated_bounds.radius = radius;
 
     // initialize things like area and inertia now that the bounds are set
     compute_area_and_inertia(phys);
@@ -180,8 +454,8 @@ void physics_set_bounds_circle(struct phys_data *phys, float radius) {
 void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct vec2 *vertices) {
     struct vec2 *vert;
 
-    phys->bounds.type = BOUNDS_TYPE_POLY;
-    phys->bounds.n_vertices = n_vertices > MAX_POLY_SIDES ? MAX_POLY_SIDES : n_vertices;
+    phys->bounds.type = phys->translated_bounds.type = BOUNDS_TYPE_POLY;
+    phys->bounds.n_vertices = phys->translated_bounds.n_vertices = n_vertices > MAX_POLY_SIDES ? MAX_POLY_SIDES : n_vertices;
 
     for (int i = 0; i < phys->bounds.n_vertices; i++) {
         phys->bounds.vertices[i].x = vertices[i].x;

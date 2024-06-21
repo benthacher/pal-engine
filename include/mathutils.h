@@ -158,6 +158,14 @@ void vec2_rotate(struct vec2 *v, float angle, struct vec2 *v_out);
 void vec2_scale(struct vec2 *v, float scale, struct vec2 *v_out);
 
 /**
+ * @brief Normalizes vector
+ *
+ * @param v
+ * @param v_out
+ */
+void vec2_normalize(struct vec2 *v, struct vec2 *v_out);
+
+/**
  * @brief Determinant of matrix
  *
  * @param m

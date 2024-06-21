@@ -21,6 +21,7 @@ struct bounds {
         float radius;
     };
     float furthest_vertex_squared;
+    float furthest_vertex_distance;
     float area;
 };
 
@@ -31,21 +32,24 @@ struct phys_data {
     float angle;
     float angular_velocity;
     float torque;
+    float elasticity;
     float mass, inv_mass;
     float moment_of_inertia, inv_moment_of_inertia;
     struct bounds bounds;
+    struct bounds translated_bounds;
 };
 
 /**
  * @brief Struct describing collision
  *
  */
-struct collision_manifold {
+struct collision_descriptor {
+    bool should_resolve;
+    float penitration_depth;
     struct phys_data *phys1;
     struct phys_data *phys2;
-    struct vec2 *normal;
-    float penitration_depth;
-    struct vec2 *contact;
+    struct vec2 normal;
+    struct vec2 contact;
 };
 
 // void physics_resolve_collision(struct collision_manifold *collision);
@@ -100,6 +104,13 @@ void physics_integrate(struct phys_data *phys, float dt);
 void physics_scale_bounds(struct phys_data *phys, float factor);
 
 /**
+ * @brief Computes translated bounds based on angle and position of phys_data
+ *
+ * @param phys
+ */
+void physics_compute_translated_bounds(struct phys_data *phys);
+
+/**
  * @brief Checks if point is inside phys_data bounds
  *
  * @param phys
@@ -108,3 +119,21 @@ void physics_scale_bounds(struct phys_data *phys, float factor);
  * @return false
  */
 bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point);
+
+/**
+ * @brief Detects collision between two objects, filling in collision information if collision is detected
+ *
+ * @param phys1
+ * @param phys2
+ * @param collision
+ * @return true
+ * @return false
+ */
+bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision);
+
+/**
+ * @brief Resolve collision based on collision descriptor
+ *
+ * @param collision
+ */
+void physics_resolve_collision(struct collision_descriptor *collision);

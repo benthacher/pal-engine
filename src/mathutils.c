@@ -78,6 +78,12 @@ void vec2_scale(struct vec2 *v, float scale, struct vec2 *v_out) {
     v_out->y = v->y * scale;
 }
 
+void vec2_normalize(struct vec2 *v, struct vec2 *v_out) {
+    float mag = vec2_mag(v);
+    v_out->x = v->x / mag;
+    v_out->y = v->y / mag;
+}
+
 float mat2_det(struct mat2 *m) {
     return m->a * m->d - m->b * m->c;
 }
