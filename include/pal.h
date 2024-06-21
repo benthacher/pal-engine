@@ -14,7 +14,14 @@
  */
 
 #include <stdint.h>
-#include "mathutils.h"
+#include <stdbool.h>
+
+// Set this flag in the CMakeLists.txt file depending on the desired platform precision
+#if defined PAL_USE_FLOAT32 && PAL_USE_FLOAT32 == 1
+typedef float pal_float_t;
+#else
+typedef double pal_float_t;
+#endif
 
 #define container_of(ptr, type, member) ({                      \
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
@@ -32,6 +39,37 @@ extern const screen_dim_t PAL_SCREEN_WIDTH;
 extern const screen_dim_t PAL_SCREEN_HEIGHT;
 extern uint32_t PAL_AUDIO_SAMPLE_RATE;
 extern const uint32_t PAL_RAND_MAX;
+
+
+/**
+ * @brief 2D Vector
+ *
+ */
+struct vec2 {
+    pal_float_t x;
+    pal_float_t y;
+};
+
+/**
+ * @brief 3D Vector
+ *
+ */
+struct vec3 {
+    pal_float_t x;
+    pal_float_t y;
+    pal_float_t z;
+};
+
+/**
+ * @brief 2D Matrix
+ *
+ */
+struct mat2 {
+    pal_float_t a;
+    pal_float_t b;
+    pal_float_t c;
+    pal_float_t d;
+};
 
 struct color {
     uint8_t r;
@@ -145,17 +183,17 @@ void pal_set_audio_callback(pal_audio_callback_t audio_callback);
  * @brief Sine function
  *
  * @param a
- * @return float
+ * @return pal_float_t
  */
-float pal_sin(float a);
+pal_float_t pal_sin(pal_float_t a);
 
 /**
  * @brief Cosine function
  *
  * @param a
- * @return float
+ * @return pal_float_t
  */
-float pal_cos(float a);
+pal_float_t pal_cos(pal_float_t a);
 
 /**
  * @brief Random number between 0 and PAL_RAND_MAX

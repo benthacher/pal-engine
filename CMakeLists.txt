@@ -38,3 +38,11 @@ add_dependencies(pal_engine generated_midi_files generated_sprite_files)
 target_include_directories(pal_engine PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/include ${PAL_BACKEND_INCLUDES})
 
 target_link_libraries(pal_engine m ${PAL_BACKEND_LIBRARIES})
+
+if("${PAL_USE_FLOAT32}" STREQUAL "1")
+    message(STATUS "Using single precision floats")
+    # Make sure floating point constants are floats
+    target_compile_options(pal_engine PRIVATE -fsingle-precision-constant)
+else()
+    message(STATUS "Using double precision floats")
+endif()
