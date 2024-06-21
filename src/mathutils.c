@@ -102,3 +102,15 @@ bool mat2_inv(struct mat2 *m, struct mat2 *m_inv) {
 
     return true;
 }
+
+pal_float_t rand_float() {
+    return pal_rand() / ((pal_float_t) PAL_RAND_MAX + 1);
+}
+
+pal_float_t rand_float_range(pal_float_t min, pal_float_t max) {
+    return pal_rand() / (((pal_float_t) PAL_RAND_MAX + 1) / (max - min)) + min;
+}
+
+int rand_range(int min, int max) {
+    return pal_rand() % (max - min) + min;
+}
