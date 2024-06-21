@@ -149,5 +149,6 @@ pal_float_t mat2_det(struct mat2 *m);
  *
  * @param m
  * @param m_inv
+ * @return bool true if matrix is able to be inverted and false if not
  */
 bool mat2_inv(struct mat2 *m, struct mat2 *m_inv);
