@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "pal.h"
 
 #define MIDI_MAX_TRACKS 16
 #define MIDI_NUM_CHANNELS 16
@@ -181,9 +182,9 @@ bool midi_parser_next_event(struct midi_parser *parser, struct midi_event *event
  * @brief Function to convert note number to frequency in Hz
  *
  * @param note_number Note number from midi event
- * @return float frequency [Hz]
+ * @return pal_float_t frequency [Hz]
  */
-float midi_parser_note_frequency(uint8_t note_number);
+pal_float_t midi_parser_note_frequency(uint8_t note_number);
 
 /**
  * @brief Check if the parser has completed (all tracks have ended)

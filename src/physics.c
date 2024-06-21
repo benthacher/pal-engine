@@ -9,7 +9,7 @@ static int num_phys2_collision_axes;
 
 static void find_furthest_vertex_squared(struct phys_data *phys) {
     if (phys->bounds.type == BOUNDS_TYPE_POLY) {
-        float dist_squared;
+        pal_float_t dist_squared;
         phys->bounds.furthest_vertex_squared = -1;
 
         for (int i = 0; i < phys->bounds.n_vertices; i++) {
@@ -27,10 +27,10 @@ static void find_furthest_vertex_squared(struct phys_data *phys) {
 
 static void compute_area_and_inertia(struct phys_data *phys) {
     // calculate area and inertia in one shot
-    float inertia = 0.0;
+    pal_float_t inertia = 0.0;
 
     if (phys->bounds.type == BOUNDS_TYPE_POLY) {
-        float p1_dir, p1_mag;
+        pal_float_t p1_dir, p1_mag;
         struct vec2 *p1;
         struct vec2 *p2;
         struct vec2 p2_rotated;
@@ -44,9 +44,9 @@ static void compute_area_and_inertia(struct phys_data *phys) {
 
             vec2_rotate(p2, -p1_dir, &p2_rotated);
 
-            float b = p1_mag;
-            float h = p2_rotated.y;
-            float a = p2_rotated.x;
+            pal_float_t b = p1_mag;
+            pal_float_t h = p2_rotated.y;
+            pal_float_t a = p2_rotated.x;
 
             inertia += (b * (h * h * h)) / 12 + ((b * b * b) * h + (b * b) * h * a + b * h * (a * a)) / 12;
             phys->bounds.area += vec2_mag(p2) * p1_mag * sin(vec2_dir(p2) - p1_dir) / 2;
@@ -63,7 +63,7 @@ static void compute_area_and_inertia(struct phys_data *phys) {
     phys->inv_moment_of_inertia = phys->moment_of_inertia > 0.0 ? 1.0 / phys->moment_of_inertia : INFINITY;
 }
 
-void physics_init(struct phys_data *phys, float mass) {
+void physics_init(struct phys_data *phys, pal_float_t mass) {
     phys->position.x = 0.0;
     phys->position.y = 0.0;
     phys->velocity.x = 0.0;
@@ -78,7 +78,7 @@ void physics_init(struct phys_data *phys, float mass) {
     phys->elasticity = 1.0;
 }
 
-void physics_scale_bounds(struct phys_data *phys, float factor) {
+void physics_scale_bounds(struct phys_data *phys, pal_float_t factor) {
     if (phys->bounds.type == BOUNDS_TYPE_POLY) {
         for (int i = 0; i < phys->bounds.n_vertices; i++) {
             vec2_scale(&phys->bounds.vertices[i], factor, &phys->bounds.vertices[i]);
@@ -119,7 +119,7 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
             vec2_sub(point, &phys->translated_bounds.vertices[i], &p3);
             vec2_sub(&phys->translated_bounds.vertices[(i + 1) % phys->bounds.n_vertices], &phys->translated_bounds.vertices[i], &p2);
 
-            float d = vec2_cross(&p3, &p2);
+            pal_float_t d = vec2_cross(&p3, &p2);
 
             if (d > 0) pos++;
             if (d < 0) neg++;
@@ -140,8 +140,8 @@ bool physics_check_point_collision(struct phys_data *phys, struct vec2 *point) {
 static void closest_vertex_to_point(struct phys_data *phys, struct vec2 *point, struct vec2 *closest) {
     struct vec2 *closest_ptr = &phys->translated_bounds.vertices[0];
     struct vec2 distance_vector;
-    float distance;
-    float min = INFINITY;
+    pal_float_t distance;
+    pal_float_t min = INFINITY;
 
     for (int i = 0; i < phys->translated_bounds.n_vertices; i++) {
         vec2_sub(&phys->translated_bounds.vertices[i], point, &distance_vector);
@@ -184,7 +184,7 @@ static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
             vec2_sub(v1, v2, axis);
             vec2_normalize(axis, axis);
             // get vector normal to axis
-            float axis_x = axis->x;
+            pal_float_t axis_x = axis->x;
             axis->x = -axis->y;
             axis->y = axis_x;
 
@@ -201,7 +201,7 @@ static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
             vec2_sub(v1, v2, axis);
             vec2_normalize(axis, axis);
             // get vector normal to axis
-            float axis_x = axis->x;
+            pal_float_t axis_x = axis->x;
             axis->x = -axis->y;
             axis->y = axis_x;
 
@@ -225,7 +225,7 @@ static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
             vec2_sub(v1, v2, axis);
             vec2_normalize(axis, axis);
             // get vector normal to axis
-            float axis_x = axis->x;
+            pal_float_t axis_x = axis->x;
             axis->x = -axis->y;
             axis->y = axis_x;
 
@@ -241,7 +241,7 @@ static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
             vec2_sub(v1, v2, axis);
             vec2_normalize(axis, axis);
             // get vector normal to axis
-            float axis_x = axis->x;
+            pal_float_t axis_x = axis->x;
             axis->x = -axis->y;
             axis->y = axis_x;
 
@@ -251,17 +251,17 @@ static void get_sat_axes(struct phys_data *phys1, struct phys_data *phys2) {
 }
 
 struct projection {
-    float min;
-    float max;
+    pal_float_t min;
+    pal_float_t max;
     struct vec2 collision_point;
 };
 
 static void project_phys_data(struct vec2 *axis, struct phys_data *phys, struct projection *projection) {
-    float proj;
+    pal_float_t proj;
 
     if (phys->translated_bounds.type == BOUNDS_TYPE_CIRCLE) {
-        float r = phys->translated_bounds.radius;
-        float pos_proj = vec2_dot(axis, &phys->position);
+        pal_float_t r = phys->translated_bounds.radius;
+        pal_float_t pos_proj = vec2_dot(axis, &phys->position);
 
         projection->min = pos_proj - r;
         projection->max = pos_proj + r;
@@ -286,7 +286,7 @@ static void project_phys_data(struct vec2 *axis, struct phys_data *phys, struct 
     }
 }
 
-static inline bool aabb_collision(float x1, float y1, float width1, float height1, float x2, float y2, float width2, float height2) {
+static inline bool aabb_collision(pal_float_t x1, pal_float_t y1, pal_float_t width1, pal_float_t height1, pal_float_t x2, pal_float_t y2, pal_float_t width2, pal_float_t height2) {
     return (x1 < x2 + width2  &&
             x1 + width1 > x2  &&
             y1 < y2 + height2 &&
@@ -294,7 +294,7 @@ static inline bool aabb_collision(float x1, float y1, float width1, float height
 }
 
 bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, struct collision_descriptor *collision) {
-    float overlap;
+    pal_float_t overlap;
     struct vec2 *smallest_axis;
     struct vec2 *axis;
     struct phys_data *vertex_obj;
@@ -324,8 +324,8 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
         if ((proj1.max > proj2.max && proj1.min < proj2.min) ||
             (proj1.max < proj2.max && proj1.min > proj2.min)) {
 
-            float mins = fabs(proj1.min - proj2.min);
-            float maxs = fabs(proj1.max - proj2.max);
+            pal_float_t mins = fabs(proj1.min - proj2.min);
+            pal_float_t maxs = fabs(proj1.max - proj2.max);
 
             if (mins < maxs) {
                 overlap += mins;
@@ -378,9 +378,9 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     struct vec2 impulse_vector;
     struct vec2 impulse_vec1, impulse_vec2;
 
-    float resolution_dist_mag = collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass);
-    float resolution_dist1_mag = resolution_dist_mag * collision->phys1->inv_mass;
-    float resolution_dist2_mag = -resolution_dist_mag * collision->phys2->inv_mass;
+    pal_float_t resolution_dist_mag = collision->penitration_depth / (collision->phys1->inv_mass + collision->phys2->inv_mass);
+    pal_float_t resolution_dist1_mag = resolution_dist_mag * collision->phys1->inv_mass;
+    pal_float_t resolution_dist2_mag = -resolution_dist_mag * collision->phys2->inv_mass;
 
     vec2_scale(&collision->normal, resolution_dist1_mag, &resolution_dist1);
     vec2_scale(&collision->normal, resolution_dist2_mag, &resolution_dist2);
@@ -403,18 +403,18 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     vec2_add(&collision->phys2->velocity, &closing_vel2, &closing_vel2);
 
     // Impulse augmentation
-    float collision_arm1_cross_normal = vec2_cross(&collision_arm1, &collision->normal);
-    float impulse_aug1 = collision->phys1->inv_moment_of_inertia * collision_arm1_cross_normal * collision_arm1_cross_normal;
-    float collision_arm2_cross_normal = vec2_cross(&collision_arm2, &collision->normal);
-    float impulse_aug2 = collision->phys2->inv_moment_of_inertia * collision_arm2_cross_normal * collision_arm2_cross_normal;
+    pal_float_t collision_arm1_cross_normal = vec2_cross(&collision_arm1, &collision->normal);
+    pal_float_t impulse_aug1 = collision->phys1->inv_moment_of_inertia * collision_arm1_cross_normal * collision_arm1_cross_normal;
+    pal_float_t collision_arm2_cross_normal = vec2_cross(&collision_arm2, &collision->normal);
+    pal_float_t impulse_aug2 = collision->phys2->inv_moment_of_inertia * collision_arm2_cross_normal * collision_arm2_cross_normal;
 
     vec2_sub(&closing_vel1, &closing_vel2, &relative_velocity);
 
-    float separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
-    float new_separation_velocity = -separation_velocity * fmin(collision->phys1->elasticity, collision->phys2->elasticity);
-    float separation_velocity_diff = new_separation_velocity - separation_velocity;
+    pal_float_t separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
+    pal_float_t new_separation_velocity = -separation_velocity * fmin(collision->phys1->elasticity, collision->phys2->elasticity);
+    pal_float_t separation_velocity_diff = new_separation_velocity - separation_velocity;
 
-    float impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
+    pal_float_t impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
 
     vec2_scale(&collision->normal, impulse, &impulse_vector);
 
@@ -429,7 +429,7 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     collision->phys2->angular_velocity -= collision->phys2->inv_moment_of_inertia * vec2_cross(&collision_arm2, &impulse_vector);
 }
 
-void physics_integrate(struct phys_data *phys, float dt) {
+void physics_integrate(struct phys_data *phys, pal_float_t dt) {
     struct vec2 vel_step, acc_step;
 
     vec2_scale(&phys->force, phys->inv_mass * dt, &acc_step);
@@ -442,7 +442,7 @@ void physics_integrate(struct phys_data *phys, float dt) {
     phys->angle += phys->angular_velocity * dt;
 }
 
-void physics_set_bounds_circle(struct phys_data *phys, float radius) {
+void physics_set_bounds_circle(struct phys_data *phys, pal_float_t radius) {
     phys->bounds.type = phys->translated_bounds.type = BOUNDS_TYPE_CIRCLE;
     phys->bounds.radius = phys->translated_bounds.radius = radius;
 
@@ -467,7 +467,7 @@ void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct v
     find_furthest_vertex_squared(phys);
 }
 
-void physics_set_bounds_rect(struct phys_data *phys, float width, float height) {
+void physics_set_bounds_rect(struct phys_data *phys, pal_float_t width, pal_float_t height) {
     struct vec2 verts[4] = {
         {  width / 2,  height / 2 },
         { -width / 2,  height / 2 },

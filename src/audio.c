@@ -21,8 +21,8 @@ static int num_oscillators = 0;
 static int num_wave_samplers = 0;
 static bool running = false;
 
-static float master_gain = 1.0;
-static float dynamic_mixer_gain = 1.0;
+static pal_float_t master_gain = 1.0;
+static pal_float_t dynamic_mixer_gain = 1.0;
 static int32_t dynamic_mixer_timer = 0;
 
 static void add_oscillator(struct oscillator *osc_to_add) {
@@ -57,11 +57,11 @@ void wave_sampler_delete(struct wave_sampler *wav) {
     // wave sampler not found, who cares
 }
 
-void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, float frequency) {
+void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, pal_float_t frequency) {
     osc->voices[voice].t_increment = OSC_PERIOD * frequency / PAL_AUDIO_SAMPLE_RATE;
 }
 
-enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t amplitude, float frequency) {
+enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t amplitude, pal_float_t frequency) {
     // find voice to play
     for (enum oscillator_voice_num v = OSC_VOICE_0; v < OSC_MAX_VOICES; v++) {
         if (osc->voices[v].adsr.state == ADSR_STATE_OFF) {
@@ -346,7 +346,7 @@ static void advance_all_midi_players() {
     }
 }
 
-void audio_set_master_volume(float gain) {
+void audio_set_master_volume(pal_float_t gain) {
     master_gain = gain;
 }
 
@@ -384,7 +384,7 @@ static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
         current_sample *= master_gain;
 
         // if (amplitude * dynamic_mixer_gain > OSC_AMPLITUDE || amplitude * dynamic_mixer_gain < -OSC_AMPLITUDE) {
-        //     dynamic_mixer_gain = fabs((float) OSC_AMPLITUDE / amplitude);
+        //     dynamic_mixer_gain = fabs((pal_float_t) OSC_AMPLITUDE / amplitude);
         //     dynamic_mixer_timer = PAL_AUDIO_SAMPLE_RATE * 2;
         // }
 

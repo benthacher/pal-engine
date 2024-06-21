@@ -38,7 +38,7 @@ void graphics_draw_rect(int x, int y, int width, int height, struct color color)
  * @param radius
  * @param color
  */
-void graphics_draw_circle(int x, int y, float radius, struct color color);
+void graphics_draw_circle(int x, int y, pal_float_t radius, struct color color);
 
 /**
  * @brief Draws circle edge
@@ -48,7 +48,7 @@ void graphics_draw_circle(int x, int y, float radius, struct color color);
  * @param color
  * @param stroke_width
  */
-void graphics_stroke_circle(int x, int y, float radius, struct color color, float stroke_width);
+void graphics_stroke_circle(int x, int y, pal_float_t radius, struct color color, pal_float_t stroke_width);
 
 /**
  * @brief Draws transformed rectangle centered at pos
@@ -77,4 +77,4 @@ void graphics_draw_transformed_image(struct image *image, int x, int y, struct m
  * @param pos
  * @param scale
  */
-void graphics_draw_image(struct image *image, int x, int y, float angle, float scale);
+void graphics_draw_image(struct image *image, int x, int y, pal_float_t angle, pal_float_t scale);

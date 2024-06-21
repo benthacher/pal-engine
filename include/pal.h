@@ -168,9 +168,9 @@ bool pal_poll_event(struct pal_event *event);
 /**
  * @brief Get time in seconds (resolution platform dependent)
  *
- * @return double
+ * @return pal_float_t
  */
-double pal_get_time();
+pal_float_t pal_get_time();
 
 /**
  * @brief Sets audio callback, called when the audio subsystem is ready for samples

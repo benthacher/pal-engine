@@ -150,7 +150,7 @@ void oscillator_delete(struct oscillator *osc);
  * @param frequency
  * @return enum oscillator_voice_num
  */
-enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t amplitude, float frequency);
+enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t amplitude, pal_float_t frequency);
 
 /**
  * @brief Stops given oscillator voice
@@ -167,7 +167,7 @@ void oscillator_stop_voice(struct oscillator *osc, enum oscillator_voice_num voi
  * @param voice
  * @param frequency
  */
-void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, float frequency);
+void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, pal_float_t frequency);
 
 /**
  * @brief Adds filter to filter chain of oscillator
@@ -217,4 +217,4 @@ void audio_start();
  *
  * @param gain
  */
-void audio_set_master_volume(float gain);
+void audio_set_master_volume(pal_float_t gain);

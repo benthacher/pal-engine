@@ -20,7 +20,7 @@ struct entity_list_node {
     struct entity_list_node *prev;
 };
 
-static double frame_start, frame_duration;
+static pal_float_t frame_start, frame_duration;
 static bool running = false;
 static struct entity_list_node *entity_list_head = NULL;
 static struct collision_descriptor collisions[MAX_COLLISIONS];
@@ -36,7 +36,7 @@ static struct pointer {
     bool previous_position_valid;
     bool can_click_entity;
 
-    double previous_time;
+    pal_float_t previous_time;
 } pointer = {
     .previous_position_valid = false,
     .can_click_entity = true,
@@ -110,7 +110,7 @@ static void detect_and_add_collision(struct entity *entity1, struct entity *enti
 
 static void emit_events() {
     struct pal_event e;
-    double current_time = pal_get_time();
+    pal_float_t current_time = pal_get_time();
 
     while (pal_poll_event(&e)) {
         switch (e.type) {
@@ -228,7 +228,7 @@ static void render_all() {
     }
 }
 
-static void update_all(float dt) {
+static void update_all(pal_float_t dt) {
     for (size_t i = 0; i < num_collisions; i++)
         physics_resolve_collision(&collisions[i]);
 

@@ -18,23 +18,23 @@ struct bounds {
             struct vec2 vertices[MAX_POLY_SIDES];
             uint8_t n_vertices;
         };
-        float radius;
+        pal_float_t radius;
     };
-    float furthest_vertex_squared;
-    float furthest_vertex_distance;
-    float area;
+    pal_float_t furthest_vertex_squared;
+    pal_float_t furthest_vertex_distance;
+    pal_float_t area;
 };
 
 struct phys_data {
     struct vec2 position;
     struct vec2 velocity;
     struct vec2 force;
-    float angle;
-    float angular_velocity;
-    float torque;
-    float elasticity;
-    float mass, inv_mass;
-    float moment_of_inertia, inv_moment_of_inertia;
+    pal_float_t angle;
+    pal_float_t angular_velocity;
+    pal_float_t torque;
+    pal_float_t elasticity;
+    pal_float_t mass, inv_mass;
+    pal_float_t moment_of_inertia, inv_moment_of_inertia;
     struct bounds bounds;
     struct bounds translated_bounds;
 };
@@ -45,7 +45,7 @@ struct phys_data {
  */
 struct collision_descriptor {
     bool should_resolve;
-    float penitration_depth;
+    pal_float_t penitration_depth;
     struct phys_data *phys1;
     struct phys_data *phys2;
     struct vec2 normal;
@@ -59,7 +59,7 @@ struct collision_descriptor {
  * @param phys
  * @param mass
  */
-void physics_init(struct phys_data *phys, float mass);
+void physics_init(struct phys_data *phys, pal_float_t mass);
 
 /**
  * @brief Sets up phys_data to be polygonal
@@ -76,7 +76,7 @@ void physics_set_bounds_poly(struct phys_data *phys, size_t n_vertices, struct v
  * @param phys
  * @param radius
  */
-void physics_set_bounds_circle(struct phys_data *phys, float radius);
+void physics_set_bounds_circle(struct phys_data *phys, pal_float_t radius);
 
 /**
  * @brief Sets up phys_data to be rectangular
@@ -85,7 +85,7 @@ void physics_set_bounds_circle(struct phys_data *phys, float radius);
  * @param width
  * @param height
  */
-void physics_set_bounds_rect(struct phys_data *phys, float width, float height);
+void physics_set_bounds_rect(struct phys_data *phys, pal_float_t width, pal_float_t height);
 
 /**
  * @brief Integrates phys_data given time step (dt)
@@ -93,7 +93,7 @@ void physics_set_bounds_rect(struct phys_data *phys, float width, float height);
  * @param phys
  * @param dt time step in seconds
  */
-void physics_integrate(struct phys_data *phys, float dt);
+void physics_integrate(struct phys_data *phys, pal_float_t dt);
 
 /**
  * @brief Scales phys_data bounds by given factor
@@ -101,7 +101,7 @@ void physics_integrate(struct phys_data *phys, float dt);
  * @param phys
  * @param factor
  */
-void physics_scale_bounds(struct phys_data *phys, float factor);
+void physics_scale_bounds(struct phys_data *phys, pal_float_t factor);
 
 /**
  * @brief Computes translated bounds based on angle and position of phys_data

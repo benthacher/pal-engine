@@ -6,7 +6,7 @@ void sprite_update(struct sprite *sprite) {
     if (sprite->sprite_def->num_frames == 1)
         return;
 
-    double current_time = pal_get_time();
+    pal_float_t current_time = pal_get_time();
 
     if (sprite->previous_time == 0.0) {
         sprite->previous_time = current_time;
@@ -41,6 +41,6 @@ void sprite_init(struct sprite *sprite, struct sprite_def *sprite_def) {
     sprite->sprite_def = sprite_def;
 }
 
-void sprite_draw(struct sprite *sprite, int x, int y, float angle, float scale) {
+void sprite_draw(struct sprite *sprite, int x, int y, pal_float_t angle, pal_float_t scale) {
     graphics_draw_image(sprite->sprite_def->frames[sprite->current_frame]->image, x, y, angle, scale);
 }
