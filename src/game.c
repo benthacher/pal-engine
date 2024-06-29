@@ -50,6 +50,20 @@ static enum button_state buttons[NUM_BUTTONS] = {
     [BUTTON_RIGHT_TRIGGER] = BUTTON_STATE_UP,
 };
 
+static struct camera {
+    struct vec2 position;
+    struct vec2 velocity;
+    struct mat2 transform;
+    struct mat2 inv_transform;
+} game_camera = {
+    .position = { 0, 0 },
+    .velocity = { 0, 0 },
+    .transform = { 1, 0, 0, -1 },
+    .inv_transform = { 1, 0, 0, -1 }
+};
+
+struct vec2 screen_center;
+
 void game_stop_loop() {
     running = false;
 }
@@ -263,10 +277,73 @@ void entity_handle_all_events() {
     }
 }
 
+void game_camera_screen_to_world(int screen_x, int screen_y, struct vec2 *world_pos) {
+    struct vec2 screen_pos;
+    screen_pos.x = screen_x - screen_center.x;
+    screen_pos.y = screen_y - screen_center.y;
+
+    vec2_transform(&screen_pos, &game_camera.inv_transform, world_pos);
+
+    vec2_add(world_pos, &game_camera.position, world_pos);
+}
+
+void game_camera_world_to_screen(struct vec2 *world_pos, int *screen_x, int *screen_y) {
+    struct vec2 diff_from_camera, diff_transformed;
+    vec2_sub(world_pos, &game_camera.position, &diff_from_camera);
+
+    vec2_transform(&diff_from_camera, &game_camera.transform, &diff_transformed);
+
+    *screen_x = pal_round(diff_transformed.x + screen_center.x);
+    *screen_y = pal_round(diff_transformed.y + screen_center.y);
+}
+
+bool game_is_point_on_screen(struct vec2 *world_pos) {
+    int screen_x, screen_y;
+
+    game_camera_world_to_screen(world_pos, &screen_x, &screen_y);
+
+    return screen_x >= 0 && screen_x <= PAL_SCREEN_WIDTH &&
+           screen_y >= 0 && screen_y <= PAL_SCREEN_HEIGHT;
+}
+
+void game_camera_set_velocity(struct vec2 *velocity) {
+    game_camera.velocity = *velocity;
+}
+
+void game_camera_set_position(struct vec2 *position) {
+    game_camera.position = *position;
+}
+
+void game_camera_get_position(struct vec2 *position) {
+    *position = game_camera.position;
+}
+
+void game_camera_set_transform(struct mat2 *transform) {
+    struct mat2 inv_transform;
+
+    if (!mat2_inv(transform, &inv_transform))
+        return;
+
+    // if matrix has inverse then set transform and inverse transform
+    game_camera.transform = *transform;
+    game_camera.inv_transform = inv_transform;
+}
+
+void game_camera_get_transform(struct mat2 *transform) {
+    *transform = game_camera.transform;
+}
+
+void game_camera_get_inv_transform(struct mat2 *inv_transform) {
+    *inv_transform = game_camera.inv_transform;
+}
+
 void game_run_loop() {
     running = true;
 
     audio_start();
+
+    screen_center.x = PAL_SCREEN_WIDTH / 2;
+    screen_center.y = PAL_SCREEN_HEIGHT / 2;
 
     // fill in translated bounds first
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
