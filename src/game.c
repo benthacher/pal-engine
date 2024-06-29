@@ -221,6 +221,11 @@ void game_get_pointer_velocity(struct vec2 *velocity) {
     velocity->y = pointer.velocity.y;
 }
 
+static void entity_event_emit_immediate(struct entity *entity, enum entity_event event_id, void *data) {
+    if (entity->_event_handlers[event_id] != NULL)
+        entity->_event_handlers[event_id](entity, data);
+}
+
 static void render_all() {
     // render entities
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
@@ -233,25 +238,23 @@ static void update_all(pal_float_t dt) {
         physics_resolve_collision(&collisions[i]);
 
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
-        if (e->entity->_event_handlers[ENTITY_EVENT_UPDATE])
-            e->entity->_event_handlers[ENTITY_EVENT_UPDATE](e->entity, (void *) &dt);
+        entity_event_emit_immediate(e->entity, ENTITY_EVENT_UPDATE, (void *) &dt);
+
+        if (entity_state_check(e->entity, ENTITY_STATE_SHOULD_BE_REMOVED)) {
+            struct entity_list_node *next = e->next;
+            // have entity handle all pending events before removing it
+            entity_handle_pending_events(e->entity);
+            // call destroy handler (destructor) if one exists
+            entity_event_emit_immediate(e->entity, ENTITY_EVENT_DESTROY, NULL);
+            // remove node from list
+            remove_entity_node_from_list(e);
+            e = next;
+            continue;
+        }
 
         if (entity_state_check(e->entity, ENTITY_STATE_DO_PHYSICS))
             physics_integrate(&e->entity->phys, dt);
     }
-
-    bool check_for_more = false;
-
-    do {
-        check_for_more = false;
-        for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next) {
-            if (entity_state_check(e->entity, ENTITY_STATE_SHOULD_BE_REMOVED)) {
-                remove_entity_node_from_list(e);
-                check_for_more = true;
-                break;
-            }
-        }
-    } while (check_for_more);
 }
 
 void entity_handle_all_events() {
