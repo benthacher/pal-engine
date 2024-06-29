@@ -316,7 +316,7 @@ bool physics_detect_collision(struct phys_data *phys1, struct phys_data *phys2, 
         project_phys_data(axis, phys1, &proj1);
         project_phys_data(axis, phys2, &proj2);
 
-        overlap = fmin(proj1.max, proj2.max) - fmax(proj1.min, proj2.min);
+        overlap = pal_fmin(proj1.max, proj2.max) - pal_fmax(proj1.min, proj2.min);
 
         if (overlap < 0)
             return false;
@@ -411,7 +411,7 @@ void physics_resolve_collision(struct collision_descriptor *collision) {
     vec2_sub(&closing_vel1, &closing_vel2, &relative_velocity);
 
     pal_float_t separation_velocity = vec2_dot(&relative_velocity, &collision->normal);
-    pal_float_t new_separation_velocity = -separation_velocity * fmin(collision->phys1->elasticity, collision->phys2->elasticity);
+    pal_float_t new_separation_velocity = -separation_velocity * pal_fmin(collision->phys1->elasticity, collision->phys2->elasticity);
     pal_float_t separation_velocity_diff = new_separation_velocity - separation_velocity;
 
     pal_float_t impulse = separation_velocity_diff / (collision->phys1->inv_mass + collision->phys2->inv_mass + impulse_aug1 + impulse_aug2);
