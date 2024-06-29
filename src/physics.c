@@ -22,7 +22,7 @@ static void find_furthest_vertex_squared(struct phys_data *phys) {
         phys->bounds.furthest_vertex_squared = phys->bounds.radius * phys->bounds.radius;
     }
 
-    phys->bounds.furthest_vertex_distance = sqrtf(phys->bounds.furthest_vertex_squared);
+    phys->bounds.furthest_vertex_distance = pal_sqrt(phys->bounds.furthest_vertex_squared);
 }
 
 static void compute_area_and_inertia(struct phys_data *phys) {

@@ -283,7 +283,10 @@ static void entity_render_stroked(struct entity *entity) {
             graphics_draw_line(pal_round(p1->x), pal_round(p1->y), pal_round(p2->x), pal_round(p2->y), entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
-        graphics_stroke_circle(pal_round(entity->phys.position.x), pal_round(entity->phys.position.y), entity->phys.bounds.radius, entity->color, 1);
+        struct mat2 camera_transform;
+        game_camera_get_transform(&camera_transform);
+        game_camera_world_to_screen(&entity->phys.position, &p1_screen_x, &p1_screen_y);
+        graphics_stroke_circle(p1_screen_x, p1_screen_y, entity->phys.bounds.radius * pal_sqrt(pal_fabs(mat2_det(&camera_transform))), entity->color, 1);
     }
 }
 

@@ -214,6 +214,14 @@ pal_float_t pal_atan2(pal_float_t y, pal_float_t x);
 pal_float_t pal_hypot(pal_float_t x, pal_float_t y);
 
 /**
+ * @brief Square root function
+ *
+ * @param x
+ * @return pal_float_t
+ */
+pal_float_t pal_sqrt(pal_float_t x);
+
+/**
  * @brief Random number between 0 and PAL_RAND_MAX
  *
  * @return uint32_t
