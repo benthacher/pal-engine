@@ -40,7 +40,8 @@ static struct pointer {
 } pointer = {
     .previous_position_valid = false,
     .can_click_entity = true,
-    .dragging_entity = NULL
+    .dragging_entity = NULL,
+    .current_state = POINTER_STATE_UP
 };
 
 static enum button_state buttons[NUM_BUTTONS] = {
@@ -225,14 +226,17 @@ enum button_state game_get_button(enum button button) {
     return buttons[button];
 }
 
+enum pointer_state game_get_pointer_state() {
+    return pointer.current_state;
+}
+
 void game_get_pointer_position(struct vec2 *position) {
     position->x = pointer.current_position.x;
     position->y = pointer.current_position.y;
 }
 
-void game_get_pointer_velocity(struct vec2 *velocity) {
-    velocity->x = pointer.velocity.x;
-    velocity->y = pointer.velocity.y;
+const struct vec2 *game_get_pointer_velocity() {
+    return (const struct vec2 *) &pointer.velocity;
 }
 
 static void entity_event_emit_immediate(struct entity *entity, enum entity_event event_id, void *data) {

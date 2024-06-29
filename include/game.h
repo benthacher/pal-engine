@@ -43,6 +43,13 @@ void game_remove_entity(struct entity *entity);
 enum button_state game_get_button(enum button button);
 
 /**
+ * @brief Returns current pointer state
+ *
+ * @return enum pointer_state
+ */
+enum pointer_state game_get_pointer_state();
+
+/**
  * @brief Get current input state of pointer position
  *
  * @param position
