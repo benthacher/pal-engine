@@ -11,10 +11,10 @@
 void graphics_draw_line(int x1, int y1, int x2, int y2, struct color color) {
     int dx = x2 - x1;
     int dy = y2 - y1;
-    int start_x = dx > 0 ? x1 : x2;
-    int start_y = dy > 0 ? y1 : y2;
-    int end_x =   dx > 0 ? x2 : x1;
-    int end_y =   dy > 0 ? y2 : y1;
+    int start_x = pal_max(dx > 0 ? x1 : x2, 0);
+    int start_y = pal_max(dy > 0 ? y1 : y2, 0);
+    int end_x =   pal_min(dx > 0 ? x2 : x1, PAL_SCREEN_WIDTH);
+    int end_y =   pal_min(dy > 0 ? y2 : y1, PAL_SCREEN_HEIGHT);
 
     int draw_x, draw_y;
 
@@ -42,8 +42,8 @@ void graphics_draw_rect(int x, int y, int width, int height, struct color c) {
 void graphics_draw_circle(int x, int y, pal_float_t radius, struct color c) {
     int start_x = pal_fmax(x - radius, 0);
     int start_y = pal_fmax(y - radius, 0);
-    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH - 1);
-    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
+    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH);
+    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT);
     int draw_x;
     int draw_y;
     pal_float_t dist;
@@ -61,8 +61,8 @@ void graphics_draw_circle(int x, int y, pal_float_t radius, struct color c) {
 void graphics_stroke_circle(int x, int y, pal_float_t radius, struct color c, pal_float_t stroke_width) {
     int start_x = pal_fmax(x - radius, 0);
     int start_y = pal_fmax(y - radius, 0);
-    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH - 1);
-    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
+    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH);
+    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT);
     int draw_x;
     int draw_y;
     pal_float_t dist;

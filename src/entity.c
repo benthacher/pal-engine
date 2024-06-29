@@ -216,8 +216,14 @@ static inline bool edge_test(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3) 
 
 static void render_triangle(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3, struct color color) {
     // get start and end point for looping through screen pixels
-    struct vec2 start = { pal_floor(pal_fmin(v1->x, pal_fmin(v2->x, v3->x))), pal_floor(pal_fmin(v1->y, pal_fmin(v2->y, v3->y))) } ;
-    struct vec2 end =   { pal_fmax(v1->x, pal_fmax(v2->x, v3->x)), pal_fmax(v1->y, pal_fmax(v2->y, v3->y)) } ;
+    struct vec2 start = {
+        .x = pal_floor(pal_fmax(pal_fmin(v1->x, pal_fmin(v2->x, v3->x)), 0.0)),
+        .y = pal_floor(pal_fmax(pal_fmin(v1->y, pal_fmin(v2->y, v3->y)), 0.0))
+    };
+    struct vec2 end = {
+        .x = pal_fmin(pal_fmax(v1->x, pal_fmax(v2->x, v3->x)), PAL_SCREEN_WIDTH),
+        .y = pal_fmin(pal_fmax(v1->y, pal_fmax(v2->y, v3->y)), PAL_SCREEN_HEIGHT)
+    };
 
     struct vec2 p = start;
     for (p.y = start.y; p.y < end.y; p.y++) {
@@ -251,13 +257,6 @@ static void entity_render_filled(struct entity *entity) {
             // transform p1 and p2 to screen coordinates
             game_camera_world_to_screen(p1, &p1_x, &p1_y);
             game_camera_world_to_screen(p2, &p2_x, &p2_y);
-            // draw line from p1 to p2
-
-            // if all points are off screen just skip rendering them
-            if (!is_screen_pos_on_screen(entity_x, entity_y) &&
-                !is_screen_pos_on_screen(p1_x, p1_y) &&
-                !is_screen_pos_on_screen(p2_x, p2_y))
-                continue;
 
             p1_screen.x = p1_x;
             p1_screen.y = p1_y;
@@ -267,26 +266,28 @@ static void entity_render_filled(struct entity *entity) {
             render_triangle(&entity_screen, &p2_screen, &p1_screen, entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
-        struct mat2 camera_transform;
-        game_camera_get_inv_transform(&camera_transform);
-        graphics_draw_circle(entity_x, entity_y, entity->phys.bounds.radius * mat2_det(&camera_transform), entity->color);
+        graphics_draw_circle(entity_x, entity_y, entity->phys.bounds.radius * mat2_det(game_camera_get_transform()), entity->color);
     }
 }
 
 static void entity_render_stroked(struct entity *entity) {
+    int p1_screen_x, p1_screen_y;
+    int p2_screen_x, p2_screen_y;
+
     if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
         struct vec2 *p1, *p2;
         for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
             p1 = &entity->phys.translated_bounds.vertices[i];
             p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
+
+            game_camera_world_to_screen(p1, &p1_screen_x, &p1_screen_y);
+            game_camera_world_to_screen(p2, &p2_screen_x, &p2_screen_y);
             // draw line from p1 to p2
-            graphics_draw_line(pal_round(p1->x), pal_round(p1->y), pal_round(p2->x), pal_round(p2->y), entity->color);
+            graphics_draw_line(p1_screen_x, p1_screen_y, p2_screen_x, p2_screen_y, entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
-        struct mat2 camera_transform;
-        game_camera_get_transform(&camera_transform);
         game_camera_world_to_screen(&entity->phys.position, &p1_screen_x, &p1_screen_y);
-        graphics_stroke_circle(p1_screen_x, p1_screen_y, entity->phys.bounds.radius * pal_sqrt(pal_fabs(mat2_det(&camera_transform))), entity->color, 1);
+        graphics_stroke_circle(p1_screen_x, p1_screen_y, entity->phys.bounds.radius * pal_sqrt(pal_fabs(mat2_det(game_camera_get_transform()))), entity->color, 1);
     }
 }
 
@@ -319,11 +320,9 @@ void entity_render(struct entity *entity) {
                 cos_angle * entity->scale,  -sin_angle * entity->scale,
                 sin_angle * entity->scale,  cos_angle * entity->scale,
             };
-            struct mat2 camera_transform;
-            game_camera_get_transform(&camera_transform);
             struct mat2 camera_reflection = { 1, 0, 0, -1 };
 
-            mat2_multiply(&sprite_transform, &camera_transform, &transform);
+            mat2_multiply(&sprite_transform, game_camera_get_transform(), &transform);
             mat2_multiply(&transform, &camera_reflection, &final_transform);
             graphics_draw_transformed_image(entity->sprite.sprite_def->frames[entity->sprite.current_frame]->image, draw_x, draw_y, &final_transform);
 
