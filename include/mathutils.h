@@ -95,7 +95,7 @@ pal_float_t lerp(pal_float_t x1, pal_float_t x2, pal_float_t t);
  * @param v
  * @return pal_float_t
  */
-pal_float_t vec2_mag(struct vec2 *v);
+pal_float_t vec2_mag(const struct vec2 *v);
 
 /**
  * @brief Computes the squared magnitude of vector
@@ -103,7 +103,7 @@ pal_float_t vec2_mag(struct vec2 *v);
  * @param v
  * @return pal_float_t
  */
-pal_float_t vec2_squared_mag(struct vec2 *v);
+pal_float_t vec2_squared_mag(const struct vec2 *v);
 
 /**
  * @brief Direction of vector
@@ -111,7 +111,7 @@ pal_float_t vec2_squared_mag(struct vec2 *v);
  * @param v
  * @return pal_float_t
  */
-pal_float_t vec2_dir(struct vec2 *v);
+pal_float_t vec2_dir(const struct vec2 *v);
 
 /**
  * @brief Sets magnitude of vector
@@ -120,7 +120,7 @@ pal_float_t vec2_dir(struct vec2 *v);
  * @param mag
  * @param v_out
  */
-void vec2_set_mag(struct vec2 *v, pal_float_t mag, struct vec2 *v_out);
+void vec2_set_mag(const struct vec2 *v, pal_float_t mag, struct vec2 *v_out);
 
 /**
  * @brief Sets direction of vector
@@ -129,7 +129,7 @@ void vec2_set_mag(struct vec2 *v, pal_float_t mag, struct vec2 *v_out);
  * @param dir
  * @param v_out
  */
-void vec2_set_dir(struct vec2 *v, pal_float_t dir, struct vec2 *v_out);
+void vec2_set_dir(const struct vec2 *v, pal_float_t dir, struct vec2 *v_out);
 
 /**
  * @brief Adds two vectors
@@ -138,7 +138,7 @@ void vec2_set_dir(struct vec2 *v, pal_float_t dir, struct vec2 *v_out);
  * @param v2
  * @param sum
  */
-void vec2_add(struct vec2 *v1, struct vec2 *v2, struct vec2 *sum);
+void vec2_add(const struct vec2 *v1, const struct vec2 *v2, struct vec2 *sum);
 
 /**
  * @brief Subtracts two vectors
@@ -147,7 +147,7 @@ void vec2_add(struct vec2 *v1, struct vec2 *v2, struct vec2 *sum);
  * @param v2
  * @param diff difference of vectors
  */
-void vec2_sub(struct vec2 *v1, struct vec2 *v2, struct vec2 *diff);
+void vec2_sub(const struct vec2 *v1, const struct vec2 *v2, struct vec2 *diff);
 
 /**
  * @brief Linear interpolation between two vectors
@@ -157,7 +157,7 @@ void vec2_sub(struct vec2 *v1, struct vec2 *v2, struct vec2 *diff);
  * @param t
  * @param v_out interpolated vector
  */
-void vec2_lerp(struct vec2 *v1, struct vec2 *v2, pal_float_t t, struct vec2 *v_out);
+void vec2_lerp(const struct vec2 *v1, const struct vec2 *v2, pal_float_t t, struct vec2 *v_out);
 
 /**
  * @brief Computes the dot product of two vectors
@@ -166,7 +166,7 @@ void vec2_lerp(struct vec2 *v1, struct vec2 *v2, pal_float_t t, struct vec2 *v_o
  * @param v2
  * @return pal_float_t dot product
  */
-pal_float_t vec2_dot(struct vec2 *v1, struct vec2 *v2);
+pal_float_t vec2_dot(const struct vec2 *v1, const struct vec2 *v2);
 
 /**
  * @brief Computes the 2d cross product between two vectors (z components = 1)
@@ -175,7 +175,7 @@ pal_float_t vec2_dot(struct vec2 *v1, struct vec2 *v2);
  * @param v2
  * @return pal_float_t
  */
-pal_float_t vec2_cross(struct vec2 *v1, struct vec2 *v2);
+pal_float_t vec2_cross(const struct vec2 *v1, const struct vec2 *v2);
 
 /**
  * @brief Perform 2D transformation with matrix m on vector v, returning a new vector
@@ -193,7 +193,7 @@ void vec2_transform(const struct vec2 *v, const struct mat2 *m, struct vec2 *v_o
  * @param angle
  * @param v_out transformed vector
  */
-void vec2_rotate(struct vec2 *v, pal_float_t angle, struct vec2 *v_out);
+void vec2_rotate(const struct vec2 *v, pal_float_t angle, struct vec2 *v_out);
 
 /**
  * @brief Scale vector v by scale, return scaled vector
@@ -202,7 +202,7 @@ void vec2_rotate(struct vec2 *v, pal_float_t angle, struct vec2 *v_out);
  * @param scale
  * @param v_out transformed vector
  */
-void vec2_scale(struct vec2 *v, pal_float_t scale, struct vec2 *v_out);
+void vec2_scale(const struct vec2 *v, pal_float_t scale, struct vec2 *v_out);
 
 /**
  * @brief Normalizes vector
@@ -210,7 +210,7 @@ void vec2_scale(struct vec2 *v, pal_float_t scale, struct vec2 *v_out);
  * @param v
  * @param v_out
  */
-void vec2_normalize(struct vec2 *v, struct vec2 *v_out);
+void vec2_normalize(const struct vec2 *v, struct vec2 *v_out);
 
 /**
  * @brief Determinant of matrix
@@ -218,7 +218,7 @@ void vec2_normalize(struct vec2 *v, struct vec2 *v_out);
  * @param m
  * @return pal_float_t
  */
-pal_float_t mat2_det(struct mat2 *m);
+pal_float_t mat2_det(const struct mat2 *m);
 
 /**
  * @brief Multiplies 2 matrices together
@@ -227,7 +227,7 @@ pal_float_t mat2_det(struct mat2 *m);
  * @param m2
  * @param product
  */
-void mat2_multiply(struct mat2 *m1, struct mat2 *m2, struct mat2 *product);
+void mat2_multiply(const struct mat2 *m1, const struct mat2 *m2, struct mat2 *product);
 
 /**
  * @brief Computes the inverse of given matrix m
@@ -236,7 +236,7 @@ void mat2_multiply(struct mat2 *m1, struct mat2 *m2, struct mat2 *product);
  * @param m_inv
  * @return bool true if matrix is able to be inverted and false if not
  */
-bool mat2_inv(struct mat2 *m, struct mat2 *m_inv);
+bool mat2_inv(const struct mat2 *m, struct mat2 *m_inv);
 
 /**
  * @brief Returns random number in range [0, 1)

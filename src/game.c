@@ -65,11 +65,11 @@ static struct camera {
 
 struct vec2 screen_center;
 
-void game_stop_loop() {
+void game_loop_stop() {
     running = false;
 }
 
-void game_add_entity(struct entity *entity) {
+void game_entity_add(struct entity *entity) {
     struct entity_list_node *new_node = (struct entity_list_node *) malloc(sizeof(struct entity_list_node));
     new_node->entity = entity;
 
@@ -84,7 +84,7 @@ void game_add_entity(struct entity *entity) {
     entity_list_head = new_node;
 }
 
-void game_remove_entity(struct entity *entity) {
+void game_entity_remove(struct entity *entity) {
     entity_state_set(entity, ENTITY_STATE_SHOULD_BE_REMOVED);
 }
 
@@ -222,20 +222,19 @@ static void emit_events() {
     }
 }
 
-enum button_state game_get_button(enum button button) {
+enum button_state game_button_check(enum button button) {
     return buttons[button];
 }
 
-enum pointer_state game_get_pointer_state() {
+enum pointer_state game_pointer_get_state() {
     return pointer.current_state;
 }
 
-void game_get_pointer_position(struct vec2 *position) {
-    position->x = pointer.current_position.x;
-    position->y = pointer.current_position.y;
+const struct vec2 *game_pointer_get_position() {
+    return (const struct vec2 *) &pointer.current_position;
 }
 
-const struct vec2 *game_get_pointer_velocity() {
+const struct vec2 *game_pointer_get_velocity() {
     return (const struct vec2 *) &pointer.velocity;
 }
 
@@ -291,7 +290,7 @@ void game_camera_screen_to_world(int screen_x, int screen_y, struct vec2 *world_
     vec2_add(world_pos, &game_camera.position, world_pos);
 }
 
-void game_camera_world_to_screen(struct vec2 *world_pos, int *screen_x, int *screen_y) {
+void game_camera_world_to_screen(const struct vec2 *world_pos, int *screen_x, int *screen_y) {
     struct vec2 diff_from_camera, diff_transformed;
     vec2_sub(world_pos, &game_camera.position, &diff_from_camera);
 
@@ -301,7 +300,7 @@ void game_camera_world_to_screen(struct vec2 *world_pos, int *screen_x, int *scr
     *screen_y = pal_round(diff_transformed.y + screen_center.y);
 }
 
-bool game_is_point_on_screen(struct vec2 *world_pos) {
+bool game_is_point_on_screen(const struct vec2 *world_pos) {
     int screen_x, screen_y;
 
     game_camera_world_to_screen(world_pos, &screen_x, &screen_y);
@@ -310,19 +309,19 @@ bool game_is_point_on_screen(struct vec2 *world_pos) {
            screen_y >= 0 && screen_y <= PAL_SCREEN_HEIGHT;
 }
 
-void game_camera_set_velocity(struct vec2 *velocity) {
+void game_camera_set_velocity(const struct vec2 *velocity) {
     game_camera.velocity = *velocity;
 }
 
-void game_camera_set_position(struct vec2 *position) {
+void game_camera_set_position(const struct vec2 *position) {
     game_camera.position = *position;
 }
 
-void game_camera_get_position(struct vec2 *position) {
-    *position = game_camera.position;
+const struct vec2 *game_camera_get_position() {
+    return (const struct vec2 *) &game_camera.position;
 }
 
-void game_camera_set_transform(struct mat2 *transform) {
+void game_camera_set_transform(const struct mat2 *transform) {
     struct mat2 inv_transform;
 
     if (!mat2_inv(transform, &inv_transform))
@@ -333,15 +332,15 @@ void game_camera_set_transform(struct mat2 *transform) {
     game_camera.inv_transform = inv_transform;
 }
 
-void game_camera_get_transform(struct mat2 *transform) {
-    *transform = game_camera.transform;
+const struct mat2 *game_camera_get_transform() {
+    return (const struct mat2 *) &game_camera.transform;
 }
 
-void game_camera_get_inv_transform(struct mat2 *inv_transform) {
-    *inv_transform = game_camera.inv_transform;
+const struct mat2 *game_camera_get_inv_transform() {
+    return (const struct mat2 *) &game_camera.inv_transform;
 }
 
-void game_run_loop() {
+void game_loop_run() {
     struct vec2 camera_scaled_velocity;
 
     running = true;
