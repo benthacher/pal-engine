@@ -342,6 +342,8 @@ void game_camera_get_inv_transform(struct mat2 *inv_transform) {
 }
 
 void game_run_loop() {
+    struct vec2 camera_scaled_velocity;
+
     running = true;
 
     audio_start();
@@ -357,6 +359,11 @@ void game_run_loop() {
         // get frame start timestamp
         frame_start = pal_get_time();
         pal_screen_clear((struct color) { 0xff, 0xff, 0xff });
+
+        // Integrate camera velocity, slow it down exponentially
+        vec2_scale(&game_camera.velocity, DT, &camera_scaled_velocity);
+        vec2_add(&game_camera.position, &camera_scaled_velocity, &game_camera.position);
+        vec2_scale(&game_camera.velocity, 0.9, &game_camera.velocity);
 
         emit_events();
 
