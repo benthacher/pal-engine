@@ -4,6 +4,82 @@
 #include "pal.h"
 
 /**
+ * @brief Absolute value function for integers
+ *
+ * @param num
+ * @return int
+ */
+int pal_abs(int num);
+
+/**
+ * @brief Absolute value function for floats
+ *
+ * @param num
+ * @return pal_float_t
+ */
+pal_float_t pal_fabs(pal_float_t num);
+
+/**
+ * @brief Floor function
+ *
+ * @param num
+ * @return pal_float_t
+ */
+pal_float_t pal_floor(pal_float_t num);
+
+/**
+ * @brief Ceiling function
+ *
+ * @param num
+ * @return pal_float_t
+ */
+pal_float_t pal_ceil(pal_float_t num);
+
+/**
+ * @brief Round function
+ *
+ * @param num
+ * @return pal_float_t
+ */
+pal_float_t pal_round(pal_float_t num);
+
+/**
+ * @brief Minimum of two floats
+ *
+ * @param a
+ * @param b
+ * @return pal_float_t
+ */
+pal_float_t pal_fmin(pal_float_t a, pal_float_t b);
+
+/**
+ * @brief Maximum of two floats
+ *
+ * @param a
+ * @param b
+ * @return pal_float_t
+ */
+pal_float_t pal_fmax(pal_float_t a, pal_float_t b);
+
+/**
+ * @brief Minimum of two ints
+ *
+ * @param a
+ * @param b
+ * @return int
+ */
+int pal_min(int a, int b);
+
+/**
+ * @brief Maximum of two ints
+ *
+ * @param a
+ * @param b
+ * @return int
+ */
+int pal_max(int a, int b);
+
+/**
  * @brief Linear interpolation
  *
  * @param x1
@@ -108,7 +184,7 @@ pal_float_t vec2_cross(struct vec2 *v1, struct vec2 *v2);
  * @param m
  * @param v_out transformed vector
  */
-void vec2_transform(struct vec2 *v, struct mat2 *m, struct vec2 *v_out);
+void vec2_transform(const struct vec2 *v, const struct mat2 *m, struct vec2 *v_out);
 
 /**
  * @brief Rotate vector v by angle, return rotated vector
@@ -143,6 +219,15 @@ void vec2_normalize(struct vec2 *v, struct vec2 *v_out);
  * @return pal_float_t
  */
 pal_float_t mat2_det(struct mat2 *m);
+
+/**
+ * @brief Multiplies 2 matrices together
+ *
+ * @param m1
+ * @param m2
+ * @param product
+ */
+void mat2_multiply(struct mat2 *m1, struct mat2 *m2, struct mat2 *product);
 
 /**
  * @brief Computes the inverse of given matrix m

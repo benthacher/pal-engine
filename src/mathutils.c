@@ -4,6 +4,58 @@
 
 #include "pal.h"
 
+int pal_abs(int num) {
+    return num > 0 ? num : -num;
+}
+
+pal_float_t pal_fabs(pal_float_t num) {
+#if defined PAL_USE_FLOAT32
+    return fabsf(num);
+#else
+    return fabs(num);
+#endif
+}
+
+pal_float_t pal_floor(pal_float_t num) {
+#if defined PAL_USE_FLOAT32
+    return floorf(num);
+#else
+    return floor(num);
+#endif
+}
+
+pal_float_t pal_ceil(pal_float_t num) {
+#if defined PAL_USE_FLOAT32
+    return ceilf(num);
+#else
+    return ceil(num);
+#endif
+}
+
+pal_float_t pal_round(pal_float_t num) {
+#if defined PAL_USE_FLOAT32
+    return roundf(num);
+#else
+    return round(num);
+#endif
+}
+
+pal_float_t pal_fmin(pal_float_t a, pal_float_t b) {
+    return a < b ? a : b;
+}
+
+pal_float_t pal_fmax(pal_float_t a, pal_float_t b) {
+    return a > b ? a : b;
+}
+
+int pal_min(int a, int b) {
+    return a < b ? a : b;
+}
+
+int pal_max(int a, int b) {
+    return a > b ? a : b;
+}
+
 pal_float_t lerp(pal_float_t x1, pal_float_t x2, pal_float_t t) {
     return x1 * (1 - t) + x2 * t;
 }
@@ -57,7 +109,7 @@ pal_float_t vec2_cross(struct vec2 *v1, struct vec2 *v2) {
     return v1->x * v2->y - v1->y * v2->x;
 }
 
-void vec2_transform(struct vec2 *v, struct mat2 *m, struct vec2 *v_out) {
+void vec2_transform(const struct vec2 *v, const struct mat2 *m, struct vec2 *v_out) {
     v_out->x = m->a * v->x + m->b * v->y;
     v_out->y = m->c * v->x + m->d * v->y;
 }
@@ -86,6 +138,13 @@ void vec2_normalize(struct vec2 *v, struct vec2 *v_out) {
 
 pal_float_t mat2_det(struct mat2 *m) {
     return m->a * m->d - m->b * m->c;
+}
+
+void mat2_multiply(struct mat2 *m1, struct mat2 *m2, struct mat2 *product) {
+    product->a = m1->a * m2->a + m1->b * m2->c;
+    product->b = m1->a * m2->b + m1->b * m2->d;
+    product->c = m1->c * m2->a + m1->d * m2->c;
+    product->d = m1->c * m2->b + m1->d * m2->d;
 }
 
 bool mat2_inv(struct mat2 *m, struct mat2 *m_inv) {
