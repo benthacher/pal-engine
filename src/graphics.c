@@ -1,20 +1,49 @@
 #include "graphics.h"
 
-#include <assert.h>
-#include <time.h>
-#include <unistd.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "mathutils.h"
 #include "pal.h"
 
+static void bound_value(int *val, int min, int max) {
+    *val = pal_min(pal_max(*val, min), max);
+}
+
+static void move_line_onto_screen(int *x0, int *y0, int *x1, int *y1) {
+    long int dx = (*x1 - *x0);
+    long int dy = (*y1 - *y0);
+    pal_float_t m = dx == 0 ? (dy > 0 ? INFINITY : -INFINITY) : ((pal_float_t) dy / dx);
+
+    // move (x0, y0) onto screen
+    if (*x0 < 0 || *x0 > PAL_SCREEN_WIDTH) {
+        bound_value(x0, 0, PAL_SCREEN_WIDTH);
+        *y0 = m * (*x0 - *x1) + *y1;
+    }
+    if (*y0 < 0 || *y0 > PAL_SCREEN_HEIGHT) {
+        bound_value(y0, 0, PAL_SCREEN_HEIGHT);
+        *x0 = (*y0 - *y1) / m + *x1;
+    }
+    // move (x1, y1) onto screen
+    if (*x1 < 0 || *x1 > PAL_SCREEN_WIDTH) {
+        bound_value(x1, 0, PAL_SCREEN_WIDTH);
+        *y1 = m * (*x1 - *x0) + *y0;
+    }
+    if (*y1 < 0 || *y1 > PAL_SCREEN_HEIGHT) {
+        bound_value(y1, 0, PAL_SCREEN_HEIGHT);
+        *x1 = (*y1 - *y0) / m + *x0;
+    }
+}
+
 void graphics_draw_line(int x1, int y1, int x2, int y2, struct color color) {
+    move_line_onto_screen(&x1, &y1, &x2, &y2);
+
     int dx = x2 - x1;
     int dy = y2 - y1;
-    int start_x = pal_max(dx > 0 ? x1 : x2, 0);
-    int start_y = pal_max(dy > 0 ? y1 : y2, 0);
-    int end_x =   pal_min(dx > 0 ? x2 : x1, PAL_SCREEN_WIDTH);
-    int end_y =   pal_min(dy > 0 ? y2 : y1, PAL_SCREEN_HEIGHT);
+    int start_x = dx > 0 ? x1 : x2;
+    int start_y = dy > 0 ? y1 : y2;
+    int end_x =   dx > 0 ? x2 : x1;
+    int end_y =   dy > 0 ? y2 : y1;
 
     int draw_x, draw_y;
 
