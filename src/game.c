@@ -52,15 +52,27 @@ static enum button_state buttons[NUM_BUTTONS] = {
 };
 
 static struct camera {
+    bool dragging;
+    enum camera_pointer_control pointer_control;
+    pal_float_t zoom;
+    pal_float_t angle;
     struct vec2 position;
     struct vec2 velocity;
     struct mat2 transform;
     struct mat2 inv_transform;
+    struct vec2 drag_start_screen;
+    union {
+        pal_float_t drag_start_angle;
+        pal_float_t drag_start_zoom;
+        struct vec2 drag_start_camera_pos;
+    };
 } game_camera = {
+    .dragging = false,
+    .pointer_control = CAMERA_POINTER_CONTROL_NONE,
+    .zoom = 1,
+    .angle = 0,
     .position = { 0, 0 },
     .velocity = { 0, 0 },
-    .transform = { 1, 0, 0, -1 },
-    .inv_transform = { 1, 0, 0, -1 }
 };
 
 struct vec2 screen_center;
@@ -120,6 +132,126 @@ static void detect_and_add_collision(struct entity *entity1, struct entity *enti
         entity_event_emit(entity1, ENTITY_EVENT_COLLISION, (void *) &desc, sizeof(struct collision_descriptor *));
         entity_event_emit(entity2, ENTITY_EVENT_COLLISION, (void *) &desc, sizeof(struct collision_descriptor *));
         num_collisions++;
+    }
+}
+
+static void camera_integrate(pal_float_t dt) {
+    struct vec2 camera_scaled_velocity;
+
+    // Integrate camera velocity, slow it down exponentially
+    vec2_scale(&game_camera.velocity, dt, &camera_scaled_velocity);
+    vec2_add(&game_camera.position, &camera_scaled_velocity, &game_camera.position);
+    vec2_scale(&game_camera.velocity, 0.9, &game_camera.velocity);
+}
+
+static void camera_calculate_transform() {
+    struct mat2 final_transform;
+
+    pal_float_t cos_angle = pal_cos(game_camera.angle);
+    pal_float_t sin_angle = pal_sin(game_camera.angle);
+
+    struct mat2 camera_scale_and_rotate = {
+        cos_angle * game_camera.zoom, -sin_angle * game_camera.zoom,
+        sin_angle * game_camera.zoom,  cos_angle * game_camera.zoom,
+    };
+
+    struct mat2 camera_reflection = { 1, 0, 0, -1 };
+
+    mat2_multiply(&camera_scale_and_rotate, &camera_reflection, &final_transform);
+
+    game_camera_set_transform(&final_transform);
+}
+
+static void camera_handle_pan() {
+    struct vec2 diff;
+    struct vec2 diff_world;
+
+    if (pointer.current_state == POINTER_STATE_DOWN) {
+        if (!game_camera.dragging) {
+            // get camera start position
+            game_camera.drag_start_camera_pos = game_camera.position;
+            // get screen coordinates
+            game_camera.drag_start_screen = pointer.current_position;
+        }
+
+        game_camera.dragging = true;
+
+        vec2_sub(&pointer.current_position, &game_camera.drag_start_screen, &diff);
+        vec2_transform(&diff, &game_camera.inv_transform, &diff_world);
+        vec2_scale(&diff_world, -1, &diff_world);
+        vec2_add(&diff_world, &game_camera.drag_start_camera_pos, &game_camera.position);
+    } else {
+        if (game_camera.dragging) {
+            struct vec2 flipped_pointer_velocity;
+            vec2_transform(&pointer.velocity, &game_camera.inv_transform, &flipped_pointer_velocity);
+            vec2_scale(&flipped_pointer_velocity, -1, &flipped_pointer_velocity);
+            game_camera.velocity = flipped_pointer_velocity;
+        }
+
+        game_camera.dragging = false;
+    }
+}
+
+static void camera_handle_zoom() {
+    if (pointer.current_state == POINTER_STATE_DOWN) {
+        if (!game_camera.dragging) {
+            // get camera start position
+            game_camera.drag_start_zoom = game_camera.zoom;
+            // get screen coordinates
+            game_camera.drag_start_screen = pointer.current_position;
+        }
+
+        game_camera.dragging = true;
+
+        game_camera.zoom = game_camera.drag_start_zoom + (game_camera.drag_start_screen.y - pointer.current_position.y) / 10;
+
+        game_camera.zoom = pal_fmax(game_camera.zoom, 0.0);
+
+        camera_calculate_transform();
+    } else {
+        game_camera.dragging = false;
+    }
+}
+
+static void camera_handle_roll() {
+    struct vec2 center_to_pointer;
+    struct vec2 center_to_drag_start;
+
+    if (pointer.current_state == POINTER_STATE_DOWN) {
+        if (!game_camera.dragging) {
+            // get camera start position
+            game_camera.drag_start_angle = game_camera.angle;
+            // get screen coordinates
+            game_camera.drag_start_screen = pointer.current_position;
+        }
+
+        game_camera.dragging = true;
+
+        vec2_sub(&pointer.current_position, &screen_center, &center_to_pointer);
+        vec2_sub(&game_camera.drag_start_screen, &screen_center, &center_to_drag_start);
+
+        game_camera.angle = game_camera.drag_start_angle + (vec2_dir(&center_to_pointer) - vec2_dir(&center_to_drag_start));
+
+        camera_calculate_transform();
+    } else {
+        game_camera.dragging = false;
+    }
+}
+
+static void camera_handle_events() {
+    switch (game_camera.pointer_control) {
+        case CAMERA_POINTER_CONTROL_PAN:
+            camera_handle_pan();
+            break;
+        case CAMERA_POINTER_CONTROL_ZOOM:
+            camera_handle_zoom();
+            break;
+        case CAMERA_POINTER_CONTROL_ROLL:
+            camera_handle_roll();
+            break;
+        case CAMERA_POINTER_CONTROL_NONE:
+        default:
+            break;
     }
 }
 
@@ -207,6 +339,8 @@ static void emit_events() {
         pointer.previous_time = current_time;
         pointer.previous_position_valid = true;
     }
+
+    camera_handle_events();
 
     // detect collisions
 
@@ -340,15 +474,19 @@ const struct mat2 *game_camera_get_inv_transform() {
     return (const struct mat2 *) &game_camera.inv_transform;
 }
 
-void game_loop_run() {
-    struct vec2 camera_scaled_velocity;
+void game_camera_set_pointer_control(enum camera_pointer_control control) {
+    game_camera.pointer_control = control;
+}
 
+void game_loop_run() {
     running = true;
 
     audio_start();
 
     screen_center.x = PAL_SCREEN_WIDTH / 2;
     screen_center.y = PAL_SCREEN_HEIGHT / 2;
+
+    camera_calculate_transform();
 
     // fill in translated bounds first
     for (struct entity_list_node *e = entity_list_head; e != NULL; e = e->next)
@@ -358,11 +496,6 @@ void game_loop_run() {
         // get frame start timestamp
         frame_start = pal_get_time();
         pal_screen_clear((struct color) { 0xff, 0xff, 0xff });
-
-        // Integrate camera velocity, slow it down exponentially
-        vec2_scale(&game_camera.velocity, DT, &camera_scaled_velocity);
-        vec2_add(&game_camera.position, &camera_scaled_velocity, &game_camera.position);
-        vec2_scale(&game_camera.velocity, 0.9, &game_camera.velocity);
 
         emit_events();
 

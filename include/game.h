@@ -8,6 +8,13 @@
 #define DT                 (1.0 / FPS)
 #define FRAME_PERIOD_US    (DT * 1000000)
 
+enum camera_pointer_control {
+    CAMERA_POINTER_CONTROL_NONE,
+    CAMERA_POINTER_CONTROL_PAN,
+    CAMERA_POINTER_CONTROL_ZOOM,
+    CAMERA_POINTER_CONTROL_ROLL,
+};
+
 /**
  * @brief Runs screen loop
  *
@@ -131,3 +138,15 @@ const struct mat2 *game_camera_get_transform();
  * @return const struct mat2*
  */
 const struct mat2 *game_camera_get_inv_transform();
+
+/**
+ * @brief Sets pointer control of game camera
+ *
+ *  CAMERA_POINTER_CONTROL_NONE: Pointer does not control camera
+ *  CAMERA_POINTER_CONTROL_PAN:  Pointer can click and drag camera position
+ *  CAMERA_POINTER_CONTROL_ZOOM: Moving pointer up or down after clicking zooms in and out
+ *  CAMERA_POINTER_CONTROL_ROLL: Pointer rotates camera about the center of the screen
+ *
+ * @param control
+ */
+void game_camera_set_pointer_control(enum camera_pointer_control control);
