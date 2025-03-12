@@ -8,17 +8,33 @@
 #include <unistd.h>
 
 #include "pal.h"
+#include "mathutils.h"
 
 #define MAX_NUM_MIDI_PLAYERS 10
 #define MAX_NUM_OSCILLATORS 100
-#define MAX_NUM_WAVE_SAMPLERS 100
+// #define PRINT_MIDI_LYRICS
+
+#define ENVELOPE_VALUE_SCALING 10
+
+uint64_t current_sample_num = 0;
+struct polyphonic_wave_sampler {
+    const struct wave_data *wave_data;
+    struct channel {
+        uint32_t pointer;
+        uint16_t amplitude;
+        bool playing;
+    } channels[MAX_CONCURRENT_SAMPLE_VOICES];
+};
+
 
 static struct midi_player *midi_players[MAX_NUM_MIDI_PLAYERS];
 static struct oscillator *oscillators[MAX_NUM_OSCILLATORS];
-static struct wave_sampler *wave_samplers[MAX_NUM_WAVE_SAMPLERS];
+static struct polyphonic_wave_sampler wave_samplers[MAX_POLYPHONIC_WAVE_SAMPLERS];
+struct filter_node *wave_samplers_filter_list_head;
+struct filter_node *master_filter_head;
+
 static int num_midi_players = 0;
 static int num_oscillators = 0;
-static int num_wave_samplers = 0;
 static bool running = false;
 
 static pal_float_t master_gain = 1.0;
@@ -41,20 +57,36 @@ void oscillator_delete(struct oscillator *osc) {
     // oscillator not found, who cares
 }
 
-static void add_wave_sampler(struct wave_sampler *wav_to_add) {
-    if (num_wave_samplers < MAX_NUM_WAVE_SAMPLERS)
-        wave_samplers[num_wave_samplers++] = wav_to_add;
+wave_sample_t wave_sample_register(const struct wave_data *wave_data) {
+    for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
+        if (wave_samplers[i].wave_data == NULL) {
+            wave_samplers[i].wave_data = wave_data;
+
+            for (int j = 0; j < MAX_CONCURRENT_SAMPLE_VOICES; j++) {
+                wave_samplers[i].channels[j].pointer = 0;
+                wave_samplers[i].channels[j].playing = false;
+            }
+
+            return (wave_sample_t) i;
+        }
+    }
+
+    return (wave_sample_t) -1;
 }
 
-void wave_sampler_delete(struct wave_sampler *wav) {
-    for (int i = 0; i < num_wave_samplers; i++) {
-        if (wave_samplers[i] == wav) {
-            // set current wave sampler to the last wave sampler in the list, decrement number of wave samplers
-            wave_samplers[i] = wave_samplers[num_wave_samplers--];
+void wave_sample_play(wave_sample_t sample, uint16_t amplitude) {
+    if (sample == -1 || wave_samplers[sample].wave_data == NULL)
+        return;
+
+    // find free sample voice and play it
+    for (int8_t i = 0; i < MAX_CONCURRENT_SAMPLE_VOICES; i++) {
+        if (!wave_samplers[sample].channels[i].playing) {
+            wave_samplers[sample].channels[i].playing = true;
+            wave_samplers[sample].channels[i].pointer = 0;
+            wave_samplers[sample].channels[i].amplitude = amplitude;
             return;
         }
     }
-    // wave sampler not found, who cares
 }
 
 void oscillator_change_voice_frequency(struct oscillator *osc, enum oscillator_voice_num voice, pal_float_t frequency) {
@@ -66,9 +98,9 @@ enum oscillator_voice_num oscillator_play_voice(struct oscillator *osc, uint16_t
     for (enum oscillator_voice_num v = OSC_VOICE_0; v < OSC_MAX_VOICES; v++) {
         if (osc->voices[v].adsr.state == ADSR_STATE_OFF) {
             // start playing this voice
-            osc->voices[v].t_increment = OSC_PERIOD * frequency / PAL_AUDIO_SAMPLE_RATE;
             osc->voices[v].adsr.state = ADSR_STATE_ATTACK;
             osc->voices[v].amplitude = amplitude;
+            oscillator_change_voice_frequency(osc, v, frequency);
             return v;
         }
     }
@@ -81,24 +113,14 @@ void oscillator_stop_voice(struct oscillator *osc, enum oscillator_voice_num voi
         osc->voices[voice].adsr.state = ADSR_STATE_RELEASE;
 }
 
-void wave_sampler_play_sample(struct wave_sampler *wav, int sample, uint16_t amplitude) {
-    wav->samples[sample].amplitude = amplitude;
-    wav->samples[sample].pointer = 0;
-    wav->samples[sample].playing = true;
-}
-
-void wave_sampler_stop_sample(struct wave_sampler *wav, int sample) {
-    wav->samples[sample].playing = false;
-}
-
 void oscillator_init(struct oscillator *osc, uint32_t attack_ms, uint32_t decay_ms, int16_t sustain_value, uint32_t release_ms, oscillator_waveform_func_t waveform) {
     for (enum oscillator_voice_num v = OSC_VOICE_0; v < OSC_MAX_VOICES; v++) {
         osc->voices[v].adsr.state = ADSR_STATE_OFF;
         osc->voices[v].adsr.envelope_value = 0;
-        osc->voices[v].adsr.attack_step = (OSC_AMPLITUDE * 1000) / (attack_ms * PAL_AUDIO_SAMPLE_RATE);
-        osc->voices[v].adsr.decay_step = ((OSC_AMPLITUDE - sustain_value) * 1000) / (decay_ms * PAL_AUDIO_SAMPLE_RATE);
-        osc->voices[v].adsr.sustain = sustain_value;
-        osc->voices[v].adsr.release_step = (sustain_value * 1000) / (release_ms * PAL_AUDIO_SAMPLE_RATE);
+        osc->voices[v].adsr.attack_step = ENVELOPE_VALUE_SCALING * (OSC_AMPLITUDE * 1000) / (attack_ms * PAL_AUDIO_SAMPLE_RATE);
+        osc->voices[v].adsr.decay_step = ENVELOPE_VALUE_SCALING * ((OSC_AMPLITUDE - sustain_value) * 1000) / (decay_ms * PAL_AUDIO_SAMPLE_RATE);
+        osc->voices[v].adsr.sustain = ENVELOPE_VALUE_SCALING * sustain_value;
+        osc->voices[v].adsr.release_step = ENVELOPE_VALUE_SCALING * (sustain_value * 1000) / (release_ms * PAL_AUDIO_SAMPLE_RATE);
     }
 
     osc->waveform = waveform;
@@ -108,13 +130,16 @@ void oscillator_init(struct oscillator *osc, uint32_t attack_ms, uint32_t decay_
     add_oscillator(osc);
 }
 
-void wave_sampler_init(struct wave_sampler *wav) {
-    for (int i = 0; i < WAVE_SAMPLER_MAX_SAMPLES; i++) {
-        wav->samples[i].playing = false;
-        wav->samples[i].wave_data == NULL;
-    }
+void wave_sampler_init() {
+    for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
+        wave_samplers[i].wave_data == NULL;
 
-    add_wave_sampler(wav);
+        for (int j = 0; j < MAX_CONCURRENT_SAMPLE_VOICES; j++) {
+            wave_samplers[i].channels[j].amplitude = 0;
+            wave_samplers[i].channels[j].pointer = 0;
+            wave_samplers[i].channels[j].playing = false;
+        }
+    }
 }
 
 void oscillator_add_effect(struct oscillator *osc, struct effect_node *effect) {
@@ -187,6 +212,7 @@ static int32_t run_filter_chain(struct filter_node *filter_list_head, int32_t in
 
 static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
     int32_t sample = 0;
+    int active_voices = 0;
 
     // run effects
     struct effect_node *effect = osc->effect_list_head;
@@ -199,34 +225,54 @@ static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
         if (osc->voices[v].adsr.state == ADSR_STATE_OFF)
             continue;
 
-        sample += (osc->waveform(osc->voices[v].t) * osc->voices[v].adsr.envelope_value) / OSC_AMPLITUDE * osc->voices[v].amplitude / OSC_AMPLITUDE;
+        sample += (osc->waveform(osc->voices[v].t) * osc->voices[v].adsr.envelope_value / ENVELOPE_VALUE_SCALING) / OSC_AMPLITUDE * osc->voices[v].amplitude / OSC_AMPLITUDE;
         osc->voices[v].t = (osc->voices[v].t + osc->voices[v].t_increment) & OSC_PERIOD_MASK;
+        active_voices++;
 
         advance_adsr_envelope(&osc->voices[v].adsr);
     }
 
-    sample = run_filter_chain(osc->filter_list_head, sample);
-
+    active_voices = 4;
     // scale sample by active voices to leave room each voice
-    return sample / OSC_MAX_VOICES / 2;
+    if (active_voices > 0)
+        sample = run_filter_chain(osc->filter_list_head, sample / active_voices);
+
+    return sample;
 }
 
-static int32_t wave_sampler_get_sample_and_advance(struct wave_sampler *wav) {
+static int32_t wave_sampler_get_sample_and_advance() {
     int32_t sample = 0;
+    int32_t voice_sample;
+    int active_samples = 0;
+    int active_voice_samples;
 
-    for (int i = 0; i < WAVE_SAMPLER_MAX_SAMPLES; i++) {
-        if (!wav->samples[i].playing || wav->samples[i].wave_data == NULL)
+    for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
+        if (wave_samplers[i].wave_data == NULL)
             continue;
 
-        sample += wav->samples[i].wave_data->data[wav->samples[i].pointer++] * wav->samples[i].amplitude / OSC_AMPLITUDE;
+        active_samples++;
+        active_voice_samples = 0;
+        voice_sample = 0;
 
-        if (wav->samples[i].pointer >= wav->samples[i].wave_data->length)
-            wav->samples[i].playing = false;
+        for (int j = 0; j < MAX_CONCURRENT_SAMPLE_VOICES; j++) {
+            if (!wave_samplers[i].channels[j].playing)
+                continue;
+
+            active_voice_samples++;
+            voice_sample += wave_samplers[i].wave_data->data[wave_samplers[i].channels[j].pointer++] * wave_samplers[i].channels[j].amplitude / OSC_AMPLITUDE;
+
+            if (wave_samplers[i].channels[j].pointer >= wave_samplers[i].wave_data->length)
+                wave_samplers[i].channels[j].playing = false;
+        }
+
+        if (active_voice_samples > 0)
+            sample += voice_sample / active_voice_samples;
     }
 
-    sample = run_filter_chain(wav->filter_list_head, sample);
+    if (active_samples > 0)
+        sample /= active_samples;
 
-    return sample / 10;
+    return run_filter_chain(wave_samplers_filter_list_head, sample);
 }
 
 static void add_midi_player(struct midi_player *player_to_add) {
@@ -249,36 +295,28 @@ int32_t square_wave(uint32_t t) {
     return (t < OSC_PERIOD / 2) ? OSC_AMPLITUDE : -OSC_AMPLITUDE;
 }
 
-static void midi_player_assign_drum_sample_to_note(struct midi_player *player, uint8_t note_number, int sample_number, const struct wave_data *wave_data) {
-    player->note_to_drum_sample[note_number] = sample_number;
-    player->drums.samples[sample_number].wave_data = wave_data;
+void midi_player_assign_drum_sample_to_note(struct midi_player *player, wave_sample_t sample, int note_number) {
+    player->drum_samples[note_number] = sample;
 }
 
 void midi_player_init(struct midi_player *player) {
     for (int i = 0; i < MIDI_NUM_CHANNELS - 1; i++) {
-        oscillator_init(&player->oscillators[i], 1, 100, OSC_AMPLITUDE * 0.9, 1, &square_wave);
+        oscillator_init(&player->oscillators[i], 10, 100, OSC_AMPLITUDE * 0.9, 100, &square_wave);
+        player->channel_transpose[i] = 0;
     }
 
-    wave_sampler_init(&player->drums);
+    wave_sampler_init();
 
-    memset(player->note_to_drum_sample, -1, sizeof(player->note_to_drum_sample));
-
-    // add da samples!
-    // midi_player_assign_drum_sample_to_note(player, 38, 0, &snare_wav);
-    // midi_player_assign_drum_sample_to_note(player, 40, 0, &snare_wav);
-    // midi_player_assign_drum_sample_to_note(player, 35, 1, &kick_wav);
-    // midi_player_assign_drum_sample_to_note(player, 36, 1, &kick_wav);
-    // midi_player_assign_drum_sample_to_note(player, 49, 2, &crash_wav);
-    // midi_player_assign_drum_sample_to_note(player, 52, 2, &crash_wav);
-    // midi_player_assign_drum_sample_to_note(player, 55, 2, &crash_wav);
-    // midi_player_assign_drum_sample_to_note(player, 44, 3, &closed_hat_wav);
-    // midi_player_assign_drum_sample_to_note(player, 42, 3, &closed_hat_wav);
-    // midi_player_assign_drum_sample_to_note(player, 46, 4, &open_hat_wav);
-    // midi_player_assign_drum_sample_to_note(player, 56, 5, &cowbell_wav);
-    // midi_player_assign_drum_sample_to_note(player, 62, 5, &cowbell_wav);
-    // midi_player_assign_drum_sample_to_note(player, 54, 5, &cowbell_wav);
+    memset(player->drum_samples, WAVE_SAMPLE_INVALID, NUM_DRUM_NOTES * sizeof(wave_sample_t));
 
     add_midi_player(player);
+}
+
+struct oscillator *midi_player_get_channel_oscillator(struct midi_player *player, uint8_t channel) {
+    if (channel > MIDI_DRUM_CHANNEL)
+        channel--;
+
+    return &player->oscillators[channel];
 }
 
 void midi_player_load_midi(struct midi_player *player, uint8_t *midi_data_source) {
@@ -289,15 +327,15 @@ static void midi_channel_note_on(struct midi_player *player, uint8_t channel, ui
     uint16_t amplitude = (OSC_AMPLITUDE * velocity) / 127;
 
     if (channel == MIDI_DRUM_CHANNEL) {
-        if (player->note_to_drum_sample[note_number] > -1)
-            wave_sampler_play_sample(&player->drums, player->note_to_drum_sample[note_number], amplitude);
+        if (player->drum_samples[note_number] != WAVE_SAMPLE_INVALID)
+            wave_sample_play(player->drum_samples[note_number], amplitude);
         else
-            printf("unknown drum sample!! maybe make it hehe\n");
+            printf("unassigned drum sample on note %d! maybe make it hehe\n", note_number);
     } else {
         if (channel > MIDI_DRUM_CHANNEL)
             channel--;
 
-        enum oscillator_voice_num voice = oscillator_play_voice(&player->oscillators[channel], amplitude, midi_parser_note_frequency(note_number));
+        enum oscillator_voice_num voice = oscillator_play_voice(&player->oscillators[channel], amplitude, midi_parser_note_frequency(note_number + player->channel_transpose[channel]));
 
         if (voice == OSC_VOICE_NONE)
             return; // no voices left! skip note
@@ -309,8 +347,7 @@ static void midi_channel_note_on(struct midi_player *player, uint8_t channel, ui
 
 static void midi_channel_note_off(struct midi_player *player, uint8_t channel, uint8_t note_number) {
     if (channel == MIDI_DRUM_CHANNEL) {
-        if (player->note_to_drum_sample[note_number] > -1)
-            wave_sampler_stop_sample(&player->drums, player->note_to_drum_sample[note_number]);
+        return;
     } else {
         if (channel > MIDI_DRUM_CHANNEL)
             channel--;
@@ -323,12 +360,12 @@ static void midi_channel_note_off(struct midi_player *player, uint8_t channel, u
     }
 }
 
-static void midi_player_advance(struct midi_player *player, uint32_t delta_time_us) {
+static void midi_player_advance(struct midi_player *player, uint32_t delta_time_ns) {
     struct midi_event event;
     struct oscillator *osc;
 
     // return if no events to parse
-    if (!midi_parser_advance(&player->parser, delta_time_us))
+    if (!midi_parser_advance(&player->parser, delta_time_ns))
         return;
 
     while (midi_parser_next_event(&player->parser, &event)) {
@@ -336,13 +373,27 @@ static void midi_player_advance(struct midi_player *player, uint32_t delta_time_
             midi_channel_note_on(player, event.status.channel, event.note, event.velocity);
         } else if (event.status.status_code == MIDI_STATUS_NOTE_OFF) {
             midi_channel_note_off(player, event.status.channel, event.note);
+#if defined(PRINT_MIDI_LYRICS)
+        } else if (event.status.midi_system_code == MIDI_SYSTEM_META_ESCAPE && event.meta.code == MIDI_META_EVENT_LYRIC) {
+            printf("%*s", event.meta.length, (char *) event.meta.data);
+            if (event.meta.data[event.meta.length-1] == '\r')
+                putc('\n', stdout);
+            fflush(stdout);
+#endif
         }
     }
 }
 
+void midi_player_set_channel_transpose(struct midi_player *player, int channel, int8_t transpose) {
+    if (channel > MIDI_DRUM_CHANNEL)
+        channel--;
+
+    player->channel_transpose[channel] = transpose;
+}
+
 static void advance_all_midi_players() {
     for (int i = 0; i < num_midi_players; i++) {
-        midi_player_advance(midi_players[i], 1000000 / PAL_AUDIO_SAMPLE_RATE);
+        midi_player_advance(midi_players[i], (uint32_t) pal_round(1000000000 / PAL_AUDIO_SAMPLE_RATE));
     }
 }
 
@@ -350,9 +401,22 @@ void audio_set_master_volume(pal_float_t gain) {
     master_gain = gain;
 }
 
+void audio_add_filter(struct filter_node *filter) {
+    if (master_filter_head == NULL) {
+        master_filter_head = filter;
+    } else {
+        // add filter on the end of list
+        struct filter_node *node = master_filter_head;
+        while (node->next != NULL) node = node->next;
+        // node now points to the tail
+        node->next = filter;
+    }
+}
+
 static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
     int32_t sample;
     int32_t current_sample;
+    int num_active_oscillators;
     struct oscillator *osc;
 
     // add samples to buffer
@@ -360,7 +424,7 @@ static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
         if (running)
             advance_all_midi_players();
 
-        current_sample = 0;
+        current_sample = num_active_oscillators = 0;
 
         for (int osc_i = 0; osc_i < num_oscillators; osc_i++) {
             sample = oscillator_get_sample_and_advance(oscillators[osc_i]);
@@ -369,16 +433,15 @@ static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
                 continue;
 
             current_sample += sample;
+            num_active_oscillators++;
         }
 
-        for (int wav_i = 0; wav_i < num_wave_samplers; wav_i++) {
-            sample = wave_sampler_get_sample_and_advance(wave_samplers[wav_i]);
+        // if (num_active_oscillators > 0)
+        //     current_sample /= num_active_oscillators;
 
-            if (sample == 0)
-                continue;
+        current_sample += wave_sampler_get_sample_and_advance();
 
-            current_sample += sample;
-        }
+        current_sample = run_filter_chain(master_filter_head, current_sample);
 
         // gotta figure out this mixer weirdness to balance all sounds
         current_sample *= master_gain;
@@ -416,6 +479,14 @@ void audio_request_stop() {
         for (enum oscillator_voice_num v = OSC_VOICE_0; v < OSC_MAX_VOICES; v++) {
             oscillators[i]->voices[v].adsr.state = ADSR_STATE_RELEASE;
         }
+    }
+
+    for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
+        if (wave_samplers[i].wave_data == NULL)
+            continue;
+
+        for (int j = 0; j < MAX_CONCURRENT_SAMPLE_VOICES; j++)
+            wave_samplers[i].channels[j].playing = false;
     }
 
     while (oscillators_active) {

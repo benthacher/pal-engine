@@ -11,9 +11,9 @@
 // #define PRINT_EVENTS
 
 #ifdef PRINT_EVENTS
-#define TRACK_PRINT(track_num, fmt, ...) printf("[Track%d]: " fmt, track_num, ##__VA_ARGS__)
+#define TRACK_PRINT(parser, track_num, fmt, ...) printf("[Track%3d:%.6f]: " fmt, track_num, parser->tracks[track_num].timer / 1e9, ##__VA_ARGS__)
 #else
-#define TRACK_PRINT(track_num, fmt, ...)
+#define TRACK_PRINT(parser, track_num, fmt, ...)
 #endif
 
 static const pal_float_t SMPTE_frames_per_second_map[] = {
@@ -207,9 +207,9 @@ static void calculate_us_per_tick(struct midi_parser *parser) {
     // depending on division format, delta time ticks means a different thing
     if (parser->division.format == MIDI_FORMAT_TICKS_PER_QUARTER_NOTE) {
         // time deltas are always in ticks, if we're operating on ticks per quarter note then we evaluate based on tempo
-        parser->us_per_tick = parser->tempo_us_per_quarter_note / parser->division.ticks_per_quarter_note;
+        parser->ns_per_tick = 1000 * parser->tempo_us_per_quarter_note / parser->division.ticks_per_quarter_note;
     } else if (parser->division.format == MIDI_FORMAT_SMPTE) {
-        parser->us_per_tick = 1000000 / (SMPTE_frames_per_second_map[parser->division.midi_SMPTE_format] * parser->division.ticks_per_frame);
+        parser->ns_per_tick = 1000000000 / (SMPTE_frames_per_second_map[parser->division.midi_SMPTE_format] * parser->division.ticks_per_frame);
     }
 }
 
@@ -236,46 +236,50 @@ static void process_meta_event(struct midi_parser *parser, int track_num, struct
 
     switch (meta_code) {
         case MIDI_META_EVENT_TEXT:
-            TRACK_PRINT(track_num, "\"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "\"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_COPYRIGHT:
-            TRACK_PRINT(track_num, "Copyright: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Copyright: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_SEQUENCE_TRACK_NAME:
-            TRACK_PRINT(track_num, "Sequence/Track Name: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Sequence/Track Name: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_INSTRUMENT_NAME:
-            TRACK_PRINT(track_num, "Instrument Name: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Instrument Name: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_LYRIC:
-            TRACK_PRINT(track_num, "Lyric: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Lyric: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_MARKER:
-            TRACK_PRINT(track_num, "Marker: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Marker: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_CUE_POINT:
-            TRACK_PRINT(track_num, "Cue Point: \"%.*s\"\n", length, (char *) data);
+            TRACK_PRINT(parser, track_num, "Cue Point: \"%.*s\"\n", length, (char *) data);
             break;
         case MIDI_META_EVENT_CHANNEL_PREFIX:
-            TRACK_PRINT(track_num, "Channel prefix: %d\n", *data);
+            TRACK_PRINT(parser, track_num, "Channel prefix: %d\n", *data);
             parser->tracks[track_num].channel_prefix = *data;
             break;
         case MIDI_META_EVENT_END_OF_TRACK:
-            TRACK_PRINT(track_num, "Ended!\n");
+            TRACK_PRINT(parser, track_num, "Ended!\n");
             parser->tracks[track_num].ended = true;
 
             break;
         case MIDI_META_EVENT_SET_TEMPO:
             parser->tempo_us_per_quarter_note = data[0] << 16 | data[1] << 8 | data[2];
 
-            TRACK_PRINT(track_num, "Set tempo: %d us/qt\n", parser->tempo_us_per_quarter_note);
+            TRACK_PRINT(parser, track_num, "Set tempo: %d us/qt\n", parser->tempo_us_per_quarter_note);
 
             calculate_us_per_tick(parser);
 
             break;
+        case MIDI_META_EVENT_SMPTE_OFFSET:
+            // Data format: hr mn se fr ff
+            TRACK_PRINT(parser, track_num, "MIDI_META_EVENT_SMPTE_OFFSET: %2d:%2d:%2d.%d.%d\n", data[0], data[1], data[2], data[3], data[4]);
+            break;
         case MIDI_META_EVENT_TIME_SIGNATURE:
             // i do not give a fuck about no dang stink time signature
-            TRACK_PRINT(track_num, "Time signature set: %d/%d\n", data[0], 1 << data[1]);
+            TRACK_PRINT(parser, track_num, "Time signature set: %d/%d\n", data[0], 1 << data[1]);
             break;
         case MIDI_META_EVENT_KEY_SIGNATURE:
         case MIDI_META_EVENT_SEQUENCER_SPECIFIC:
@@ -343,7 +347,11 @@ static void process_event(struct midi_parser *parser, int track_num, struct midi
         if (event->status.status_code == MIDI_STATUS_NOTE_ON && event->velocity == 0)
             event->status.status_code = MIDI_STATUS_NOTE_OFF;
 
-        TRACK_PRINT(track_num, "event: status: %s, channel: %d\n", status_string(event->status.status_code), event->status.channel);
+        if (event->status.status_code == MIDI_STATUS_CONTROL_CHANGE) {
+            TRACK_PRINT(parser, track_num, "Controller Event: [0x%02x, 0x%02x]\n", event->raw & 0xFF, (event->raw & 0xFF00) >> 8);
+        } else {
+            TRACK_PRINT(parser, track_num, "event: status: %s, channel: %d\n", status_string(event->status.status_code), event->status.channel);
+        }
     }
 }
 
@@ -377,7 +385,7 @@ uint64_t decode_variable_length_quantity(struct midi_parser *parser, int track_n
     return result;
 }
 
-bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_us) {
+bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_ns) {
     uint64_t raw_delta_ticks;
     bool events_waiting = false;
 
@@ -389,11 +397,12 @@ bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_us) {
         if (parser->tracks[i].state == TRACK_STATE_READ_DELTA) {
             raw_delta_ticks = decode_variable_length_quantity(parser, i);
 
-            parser->tracks[i].timer = raw_delta_ticks * parser->us_per_tick;
+            parser->tracks[i].timer += raw_delta_ticks * parser->ns_per_tick;
+            parser->tracks[i].playback_time += (raw_delta_ticks * parser->ns_per_tick) / 1e9;
             parser->tracks[i].state = TRACK_STATE_WAIT_FOR_TIMER;
         }
 
-        parser->tracks[i].timer -= delta_time_us;
+        parser->tracks[i].timer -= delta_time_ns;
 
         // if track timer has reached zero, event needs to be parsed
         if (parser->tracks[i].timer <= 0) {
@@ -461,8 +470,12 @@ bool midi_parser_init(struct midi_parser *parser, void *buffer) {
         parser->tracks[i].state = TRACK_STATE_READ_DELTA;
         track_ptr += endian_swap_32(parser->track_headers[i]->length_be);
 
-        TRACK_PRINT(i, "Length: %d\n", endian_swap_32(parser->track_headers[i]->length_be));
+        TRACK_PRINT(parser, i, "Length: %d\n", endian_swap_32(parser->track_headers[i]->length_be));
     }
 
     return true;
+}
+
+void midi_parser_set_track_offset(struct midi_parser *parser, int track_num, pal_float_t offset) {
+    parser->tracks[track_num].timer = offset * 1000000000;
 }

@@ -7,10 +7,12 @@
 #include "midi_parse.h"
 
 // oscillator period is power of 2 so wrapping isn't an issue
-#define OSC_PERIOD (1 << 20)
+#define OSC_PERIOD (1 << 18)
 #define OSC_PERIOD_MASK (OSC_PERIOD - 1)
 #define OSC_AMPLITUDE INT16_MAX
-#define WAVE_SAMPLER_MAX_SAMPLES 20
+#define MAX_POLYPHONIC_WAVE_SAMPLERS (64)
+#define MAX_CONCURRENT_SAMPLE_VOICES (4)
+#define NUM_DRUM_NOTES (128)
 
 struct effect_node;
 struct filter_node;
@@ -36,6 +38,11 @@ typedef void (*effect_node_update_func_t)(struct oscillator *, struct effect_nod
  *
  */
 typedef int32_t (*filter_process_func_t)(struct filter_node *, int32_t input_sample);
+
+typedef int8_t wave_sample_t;
+#define WAVE_SAMPLE_INVALID ((wave_sample_t) -1)
+
+_Static_assert(MAX_POLYPHONIC_WAVE_SAMPLERS <= ((1 << ((sizeof(wave_sample_t) << 3) - 1)) - 1), "MAX_POLYPHONIC_WAVE_SAMPLERS must fit into wave_sample_t");
 
 enum oscillator_voice_num {
     OSC_VOICE_NONE = -1,
@@ -96,18 +103,6 @@ struct wave_data {
     uint32_t length;
 };
 
-struct wave_sample {
-    const struct wave_data *wave_data;
-    uint32_t pointer;
-    uint16_t amplitude;
-    bool playing;
-};
-
-struct wave_sampler {
-    struct wave_sample samples[WAVE_SAMPLER_MAX_SAMPLES];
-    struct filter_node *filter_list_head;
-};
-
 enum midi_channel_type {
     MIDI_CHANNEL_OSC,
     MIDI_CHANNEL_SAMPLER
@@ -116,9 +111,9 @@ enum midi_channel_type {
 struct midi_player {
     // one less oscillator channel because of the dedicated drum channel
     struct oscillator oscillators[MIDI_NUM_CHANNELS - 1];
-    struct wave_sampler drums;
     int8_t channel_voice_to_note_mapping[MIDI_NUM_CHANNELS - 1][OSC_MAX_VOICES];
-    int8_t note_to_drum_sample[128];
+    wave_sample_t drum_samples[NUM_DRUM_NOTES];
+    int8_t channel_transpose[MIDI_NUM_CHANNELS - 1];
 
     struct midi_parser parser;
 };
@@ -186,6 +181,32 @@ void oscillator_add_filter(struct oscillator *osc, struct filter_node *filter);
 void oscillator_add_effect(struct oscillator *osc, struct effect_node *effect);
 
 /**
+ * @brief Adds filter to master audio filter chain
+ *
+ * This filter is run on the final output of audio synthesis
+ *
+ * @param filter
+ */
+void audio_add_filter(struct filter_node *filter);
+
+/**
+ * @brief Registers wave sample with global wave sampler to be played later
+ * with wave_sample_play
+ *
+ * @param wave_data Pointer to wave file from assets directory
+ * @return wave_sample_t identifier to use with play/pause functions
+ */
+wave_sample_t wave_sample_register(const struct wave_data *wave_data);
+
+/**
+ * @brief Plays registered wave sample
+ *
+ * @param sample
+ * @param amplitude Amplitude of wave sample
+ */
+void wave_sample_play(wave_sample_t sample, uint16_t amplitude);
+
+/**
  * @brief Initializes midi player
  *
  * @param player
@@ -199,6 +220,35 @@ void midi_player_init(struct midi_player *player);
  * @param midi_data_source
  */
 void midi_player_load_midi(struct midi_player *player, uint8_t *midi_data_source);
+
+/**
+ * @brief Assigns drum wave sample data to drum note number in midi player
+ *
+ * @param player
+ * @param sample Sample ID returned from wave_sample_register
+ * @param note_number MIDI note number to map sample to
+ */
+void midi_player_assign_drum_sample_to_note(struct midi_player *player, wave_sample_t sample, int note_number);
+
+/**
+ * @brief Sets transpose (in note number/half steps) of given midi channel
+ *
+ * @param player
+ * @param channel
+ * @param transpose
+ * @return true
+ * @return false
+ */
+void midi_player_set_channel_transpose(struct midi_player *player, int channel, int8_t transpose);
+
+/**
+ * @brief Gets channel oscillator from midi_player for given channel
+ *
+ * @param player
+ * @param channel
+ * @return struct oscillator*
+ */
+struct oscillator *midi_player_get_channel_oscillator(struct midi_player *player, uint8_t channel);
 
 /**
  * @brief Requests audio subsystem to stop outputing sound
