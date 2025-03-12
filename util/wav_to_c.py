@@ -1,5 +1,6 @@
 #!.venv/bin/python
 
+import inflection
 import click
 import subprocess
 import os
@@ -7,15 +8,16 @@ import re
 from pathlib import Path
 from scipy.io import wavfile
 
-DESIRED_SAMPLE_RATE = 44100
-
 def get_c_symbol(symbol: str):
     return re.sub(r'[^[:alnum:]_]', '', symbol)
 
 @click.command()
 @click.argument("wav_file", type=click.Path(exists=True, readable=True))
-@click.argument("output_directory", type=click.Path(exists=True, file_okay=False, dir_okay=True))
-def wav_to_c(wav_file, output_directory):
+@click.argument("sample_rate", type=int)
+@click.argument("output_src_directory", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("output_inc_directory", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("include_path", default='')
+def wav_to_c(wav_file, sample_rate, output_src_directory, output_inc_directory, include_path):
     wav_path = Path(wav_file)
 
     if wav_path.suffix != '.wav':
@@ -25,18 +27,22 @@ def wav_to_c(wav_file, output_directory):
     wav_resampled_path = wav_path.parent / (wav_path.stem + '_resampled.wav')
 
     # convert it with ffmpeg
-    subprocess.call(['/usr/bin/ffmpeg', '-i', wav_file, '-c:a', 'pcm_s16le', '-ac', '1', '-ar', str(DESIRED_SAMPLE_RATE), wav_resampled_path ])
+    ret = subprocess.call(['/usr/bin/ffmpeg', '-y', '-i', wav_file, '-c:a', 'pcm_s16le', '-ac', '1', '-ar', str(sample_rate), wav_resampled_path ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    samplerate, data = wavfile.read(wav_resampled_path)
+    if ret != 0:
+        print(f"Failed to convert wave file! ffmpeg exited with {ret}")
+        exit(1)
 
-    assert(samplerate == DESIRED_SAMPLE_RATE)
+    wav_sample_rate, data = wavfile.read(wav_resampled_path)
+
+    assert(wav_sample_rate == sample_rate)
 
     wav_size = len(data)
-    wav_symbol = get_c_symbol(wav_path.stem) + '_wav'
+    wav_symbol = get_c_symbol(wav_path.stem)
     header_filename = wav_symbol + '.h'
 
-    output_c_path = Path(output_directory, wav_symbol + '.c')
-    output_h_path = Path(output_directory, header_filename)
+    output_c_path = Path(output_src_directory, wav_symbol + '.c')
+    output_h_path = Path(output_inc_directory, header_filename)
 
     with open(output_h_path, 'w') as out:
         out.write("#pragma once\n\n")
@@ -45,7 +51,7 @@ def wav_to_c(wav_file, output_directory):
         out.write(f"extern const struct wave_data {wav_symbol};\n\n")
 
     with open(output_c_path, 'w') as out:
-        out.write(f"#include \"{header_filename}\"\n\n")
+        out.write(f"#include \"{Path(include_path, header_filename)}\"\n\n")
         out.write("#include <stdint.h>\n\n")
         out.write(f"static const int16_t {wav_symbol}_data[{wav_size}] = {{\n")
 
@@ -67,7 +73,7 @@ def wav_to_c(wav_file, output_directory):
         out.write(f"    .length = {wav_size},\n")
         out.write(f"}};\n")
 
-    # wav_resampled_path.unlink()
+    wav_resampled_path.unlink()
 
 
 if __name__ == '__main__':

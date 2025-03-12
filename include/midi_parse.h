@@ -56,6 +56,7 @@ enum midi_meta_event_code {
     MIDI_META_EVENT_CHANNEL_PREFIX =         0x20,
     MIDI_META_EVENT_END_OF_TRACK =           0x2F,
     MIDI_META_EVENT_SET_TEMPO =              0x51,
+    MIDI_META_EVENT_SMPTE_OFFSET =           0x54,
     MIDI_META_EVENT_TIME_SIGNATURE =         0x58,
     MIDI_META_EVENT_KEY_SIGNATURE =          0x59,
     MIDI_META_EVENT_SEQUENCER_SPECIFIC =     0x7F,
@@ -85,7 +86,7 @@ union status_byte {
 
 struct track {
     uint8_t *pointer;
-    int64_t timer; // down counter until next event
+    int64_t timer; // nanosecond down counter until next event
     bool ended;
     union status_byte previous_status;
     uint8_t channel_prefix;
@@ -121,7 +122,7 @@ struct midi_parser {
     bool loop; // whether or not to loop midi playback when end is reached
     uint16_t num_tracks;
     uint32_t tempo_us_per_quarter_note;
-    uint32_t us_per_tick;
+    uint32_t ns_per_tick;
     union {
         struct {
             uint16_t ticks_per_frame : 8;
@@ -160,14 +161,14 @@ bool midi_parser_init(struct midi_parser *parser, void *buffer);
 void midi_parser_restart(struct midi_parser *parser);
 
 /**
- * @brief Advances parser by given time delta
+ * @brief Advances parser by given time delta in nanoseconds
  *
  * @param parser
- * @param delta_time_us
+ * @param delta_time_ns
  * @return true event needs to be read
  * @return false no events pending
  */
-bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_us);
+bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_ns);
 
 /**
  * @brief Gets pending event from parser
@@ -194,3 +195,12 @@ pal_float_t midi_parser_note_frequency(uint8_t note_number);
  * @return false
  */
 bool midi_parser_ended(struct midi_parser *parser);
+
+/**
+ * @brief Sets track offset to given initial time offset value in seconds
+ *
+ * @param parser
+ * @param track_num
+ * @param initial_value initial time offset in seconds
+ */
+void midi_parser_set_track_offset(struct midi_parser *parser, int track_num, pal_float_t initial_value);

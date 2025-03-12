@@ -39,7 +39,6 @@ typedef void (*pal_audio_callback_t)(audio_sample_t *samples, int num_samples);
 // Screen size must be set in pal.c depending on actual/window screen dimensions
 extern const screen_dim_t PAL_SCREEN_WIDTH;
 extern const screen_dim_t PAL_SCREEN_HEIGHT;
-extern uint32_t PAL_AUDIO_SAMPLE_RATE;
 extern const uint32_t PAL_RAND_MAX;
 
 
