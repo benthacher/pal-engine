@@ -12,6 +12,8 @@ else()
     message(STATUS "Using double precision floats")
 endif()
 
+target_compile_definitions(pal_platform_defs INTERFACE PAL_AUDIO_SAMPLE_RATE=${PAL_AUDIO_SAMPLE_RATE})
+
 if("${PAL_BACKEND_SOURCES}" STREQUAL "")
     message(FATAL_ERROR "PAL Backend not set! Before including PAL as a subdirectory, make sure to set the PAL_BACKEND_SOURCES variable to the source that implements PAL functions.")
 endif()
