@@ -51,6 +51,8 @@ void entity_init(struct entity *entity, pal_float_t mass) {
     // clear event flags
     entity->_state_flags = 0;
 
+    entity->type = ENTITY_DRAW_TYPE_INVISIBLE;
+
     // initialize event queue
     queue_init(&entity->_event_queue, entity->_event_queue_buffer, sizeof(entity->_event_queue_buffer));
 
