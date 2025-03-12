@@ -80,9 +80,9 @@ struct entity {
 
     // private stuff
     struct queue _event_queue;
-    uint8_t _event_queue_buffer[100];
     entity_event_handler_t _event_handlers[NUM_ENTITY_EVENTS];
     uint32_t _state_flags;
+    uint8_t _event_queue_buffer[100];
 };
 
 /**
