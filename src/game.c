@@ -406,6 +406,9 @@ static void update_all(pal_float_t dt) {
         if (entity_state_check(e->entity, ENTITY_STATE_DO_PHYSICS))
             physics_integrate(&e->entity->phys, dt);
     }
+
+    if (game_camera.pointer_control == CAMERA_POINTER_CONTROL_NONE)
+        camera_integrate(dt);
 }
 
 void entity_handle_all_events() {
