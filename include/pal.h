@@ -27,6 +27,8 @@ typedef double pal_float_t;
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof(type,member) );})
 
+#define entity_downcast(entity_ptr, subclass_struct) container_of(entity_ptr, subclass_struct, base)
+
 typedef uint16_t screen_dim_t;
 typedef uint16_t audio_sample_t;
 #define AUDIO_SAMPLE_MAX ((1 << (sizeof(audio_sample_t) << 3)) - 1)
@@ -212,6 +214,14 @@ pal_float_t pal_atan2(pal_float_t y, pal_float_t x);
  * @return pal_float_t
  */
 pal_float_t pal_hypot(pal_float_t x, pal_float_t y);
+
+/**
+ * @brief Square root function
+ *
+ * @param x
+ * @return pal_float_t
+ */
+pal_float_t pal_sqrt(pal_float_t x);
 
 /**
  * @brief Random number between 0 and PAL_RAND_MAX

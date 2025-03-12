@@ -37,6 +37,7 @@ enum entity_event {
     ENTITY_EVENT_BUTTON_UP,
     ENTITY_EVENT_BUTTON_DOWN,
     ENTITY_EVENT_COLLISION,
+    ENTITY_EVENT_DESTROY,
 
     NUM_ENTITY_EVENTS
 };
@@ -79,9 +80,9 @@ struct entity {
 
     // private stuff
     struct queue _event_queue;
-    uint8_t _event_queue_buffer[100];
     entity_event_handler_t _event_handlers[NUM_ENTITY_EVENTS];
     uint32_t _state_flags;
+    uint8_t _event_queue_buffer[100];
 };
 
 /**

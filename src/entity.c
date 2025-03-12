@@ -9,6 +9,7 @@
 #include "graphics.h"
 #include "physics.h"
 #include "sprite.h"
+#include "game.h"
 
 // every uninitialized entity event is zero, meaning no event data is used
 static size_t event_data_lengths[NUM_ENTITY_EVENTS] = {
@@ -49,6 +50,8 @@ void entity_init(struct entity *entity, pal_float_t mass) {
 
     // clear event flags
     entity->_state_flags = 0;
+
+    entity->type = ENTITY_DRAW_TYPE_INVISIBLE;
 
     // initialize event queue
     queue_init(&entity->_event_queue, entity->_event_queue_buffer, sizeof(entity->_event_queue_buffer));
@@ -215,8 +218,14 @@ static inline bool edge_test(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3) 
 
 static void render_triangle(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3, struct color color) {
     // get start and end point for looping through screen pixels
-    struct vec2 start = { floor(fmin(v1->x, fmin(v2->x, v3->x))), floor(fmin(v1->y, fmin(v2->y, v3->y))) } ;
-    struct vec2 end =   { fmax(v1->x, fmax(v2->x, v3->x)), fmax(v1->y, fmax(v2->y, v3->y)) } ;
+    struct vec2 start = {
+        .x = pal_floor(pal_fmax(pal_fmin(v1->x, pal_fmin(v2->x, v3->x)), 0.0)),
+        .y = pal_floor(pal_fmax(pal_fmin(v1->y, pal_fmin(v2->y, v3->y)), 0.0))
+    };
+    struct vec2 end = {
+        .x = pal_fmin(pal_fmax(v1->x, pal_fmax(v2->x, v3->x)), PAL_SCREEN_WIDTH),
+        .y = pal_fmin(pal_fmax(v1->y, pal_fmax(v2->y, v3->y)), PAL_SCREEN_HEIGHT)
+    };
 
     struct vec2 p = start;
     for (p.y = start.y; p.y < end.y; p.y++) {
@@ -227,39 +236,67 @@ static void render_triangle(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3, s
     }
 }
 
+static bool is_screen_pos_on_screen(int screen_x, int screen_y) {
+    return screen_x >= 0 && screen_x <= PAL_SCREEN_WIDTH &&
+           screen_y >= 0 && screen_y <= PAL_SCREEN_HEIGHT;
+}
+
 static void entity_render_filled(struct entity *entity) {
+    struct vec2 entity_screen;
+    int entity_x, entity_y;
+    game_camera_world_to_screen(&entity->phys.position, &entity_x, &entity_y);
+    entity_screen.x = entity_x;
+    entity_screen.y = entity_y;
+
     if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
         struct vec2 *p1, *p2;
+        int p1_x, p1_y, p2_x, p2_y;
+        struct vec2 p1_screen, p2_screen;
         for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
             p1 = &entity->phys.translated_bounds.vertices[i];
             p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
-            // draw line from p1 to p2
-            struct vec2 center = { round(entity->phys.position.x), round(entity->phys.position.y) };
-            render_triangle(&center, p1, p2, entity->color);
+
+            // transform p1 and p2 to screen coordinates
+            game_camera_world_to_screen(p1, &p1_x, &p1_y);
+            game_camera_world_to_screen(p2, &p2_x, &p2_y);
+
+            p1_screen.x = p1_x;
+            p1_screen.y = p1_y;
+            p2_screen.x = p2_x;
+            p2_screen.y = p2_y;
+
+            render_triangle(&entity_screen, &p2_screen, &p1_screen, entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
-        graphics_draw_circle(round(entity->phys.position.x), round(entity->phys.position.y), entity->phys.bounds.radius, entity->color);
+        graphics_draw_circle(entity_x, entity_y, entity->phys.bounds.radius * mat2_det(game_camera_get_transform()), entity->color);
     }
 }
 
 static void entity_render_stroked(struct entity *entity) {
+    int p1_screen_x, p1_screen_y;
+    int p2_screen_x, p2_screen_y;
+
     if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
         struct vec2 *p1, *p2;
         for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
             p1 = &entity->phys.translated_bounds.vertices[i];
             p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
+
+            game_camera_world_to_screen(p1, &p1_screen_x, &p1_screen_y);
+            game_camera_world_to_screen(p2, &p2_screen_x, &p2_screen_y);
             // draw line from p1 to p2
-            graphics_draw_line(round(p1->x), round(p1->y), round(p2->x), round(p2->y), entity->color);
+            graphics_draw_line(p1_screen_x, p1_screen_y, p2_screen_x, p2_screen_y, entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
-        graphics_stroke_circle(round(entity->phys.position.x), round(entity->phys.position.y), entity->phys.bounds.radius, entity->color, 1);
+        game_camera_world_to_screen(&entity->phys.position, &p1_screen_x, &p1_screen_y);
+        graphics_stroke_circle(p1_screen_x, p1_screen_y, entity->phys.bounds.radius * pal_sqrt(pal_fabs(mat2_det(game_camera_get_transform()))), entity->color, 1);
     }
 }
 
 void entity_render(struct entity *entity) {
     // draw entity at physical position
-    int draw_x = round(entity->phys.position.x);
-    int draw_y = round(entity->phys.position.y);
+    int draw_x = pal_round(entity->phys.position.x);
+    int draw_y = pal_round(entity->phys.position.y);
     bool previous_finished_flag;
 
     switch (entity->type) {
@@ -275,13 +312,26 @@ void entity_render(struct entity *entity) {
             if (entity->sprite.sprite_def == NULL)
                 return;
 
-            sprite_draw(&entity->sprite, draw_x, draw_y, entity->phys.angle, entity->scale);
+            game_camera_world_to_screen(&entity->phys.position, &draw_x, &draw_y);
+
+            struct mat2 transform, final_transform;
+            pal_float_t cos_angle = pal_cos(entity->phys.angle);
+            pal_float_t sin_angle = pal_sin(entity->phys.angle);
+
+            struct mat2 sprite_transform = {
+                cos_angle * entity->scale,  -sin_angle * entity->scale,
+                sin_angle * entity->scale,  cos_angle * entity->scale,
+            };
+            struct mat2 camera_reflection = { 1, 0, 0, -1 };
+
+            mat2_multiply(&sprite_transform, game_camera_get_transform(), &transform);
+            mat2_multiply(&transform, &camera_reflection, &final_transform);
+            graphics_draw_transformed_image(entity->sprite.sprite_def->frames[entity->sprite.current_frame]->image, draw_x, draw_y, &final_transform);
 
             previous_finished_flag = entity->sprite.finished;
             sprite_update(&entity->sprite);
 
-            if (entity->sprite.finished && !previous_finished_flag)
-            {
+            if (entity->sprite.finished && !previous_finished_flag) {
                 entity_event_emit(entity, ENTITY_EVENT_SPRITE_LOOP_END, NULL, 0);
             }
 

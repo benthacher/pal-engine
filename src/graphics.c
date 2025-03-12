@@ -1,15 +1,43 @@
 #include "graphics.h"
 
-#include <assert.h>
-#include <time.h>
-#include <unistd.h>
 #include <stdbool.h>
 #include <math.h>
 
 #include "mathutils.h"
 #include "pal.h"
 
+static void bound_value(int *val, int min, int max) {
+    *val = pal_min(pal_max(*val, min), max);
+}
+
+static void move_line_onto_screen(int *x0, int *y0, int *x1, int *y1) {
+    long int dx = (*x1 - *x0);
+    long int dy = (*y1 - *y0);
+    pal_float_t m = dx == 0 ? (dy > 0 ? INFINITY : -INFINITY) : ((pal_float_t) dy / dx);
+
+    // move (x0, y0) onto screen
+    if (*x0 < 0 || *x0 > PAL_SCREEN_WIDTH) {
+        bound_value(x0, 0, PAL_SCREEN_WIDTH);
+        *y0 = m * (*x0 - *x1) + *y1;
+    }
+    if (*y0 < 0 || *y0 > PAL_SCREEN_HEIGHT) {
+        bound_value(y0, 0, PAL_SCREEN_HEIGHT);
+        *x0 = (*y0 - *y1) / m + *x1;
+    }
+    // move (x1, y1) onto screen
+    if (*x1 < 0 || *x1 > PAL_SCREEN_WIDTH) {
+        bound_value(x1, 0, PAL_SCREEN_WIDTH);
+        *y1 = m * (*x1 - *x0) + *y0;
+    }
+    if (*y1 < 0 || *y1 > PAL_SCREEN_HEIGHT) {
+        bound_value(y1, 0, PAL_SCREEN_HEIGHT);
+        *x1 = (*y1 - *y0) / m + *x0;
+    }
+}
+
 void graphics_draw_line(int x1, int y1, int x2, int y2, struct color color) {
+    move_line_onto_screen(&x1, &y1, &x2, &y2);
+
     int dx = x2 - x1;
     int dy = y2 - y1;
     int start_x = dx > 0 ? x1 : x2;
@@ -19,7 +47,7 @@ void graphics_draw_line(int x1, int y1, int x2, int y2, struct color color) {
 
     int draw_x, draw_y;
 
-    if (fabs(dx) >= fabs(dy)) {
+    if (pal_fabs(dx) >= pal_fabs(dy)) {
         for (draw_x = start_x; draw_x < end_x; draw_x++) {
             draw_y = y1 + dy * (draw_x - x1) / dx;
             pal_screen_draw_pixel(draw_x, draw_y, color);
@@ -41,17 +69,17 @@ void graphics_draw_rect(int x, int y, int width, int height, struct color c) {
 }
 
 void graphics_draw_circle(int x, int y, pal_float_t radius, struct color c) {
-    int start_x = fmax(x - radius, 0);
-    int start_y = fmax(y - radius, 0);
-    int end_x =   fmin(x + radius, PAL_SCREEN_WIDTH - 1);
-    int end_y =   fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
+    int start_x = pal_fmax(x - radius, 0);
+    int start_y = pal_fmax(y - radius, 0);
+    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH);
+    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT);
     int draw_x;
     int draw_y;
     pal_float_t dist;
 
     for (draw_y = start_y; draw_y <= end_y; draw_y++) {
         for (draw_x = start_x; draw_x <= end_x; draw_x++) {
-            dist = hypotf(draw_x - x, draw_y - y);
+            dist = pal_hypot(draw_x - x, draw_y - y);
 
             if (dist < radius)
                 pal_screen_draw_pixel(draw_x, draw_y, c);
@@ -60,17 +88,17 @@ void graphics_draw_circle(int x, int y, pal_float_t radius, struct color c) {
 }
 
 void graphics_stroke_circle(int x, int y, pal_float_t radius, struct color c, pal_float_t stroke_width) {
-    int start_x = fmax(x - radius, 0);
-    int start_y = fmax(y - radius, 0);
-    int end_x =   fmin(x + radius, PAL_SCREEN_WIDTH - 1);
-    int end_y =   fmin(y + radius, PAL_SCREEN_HEIGHT - 1);
+    int start_x = pal_fmax(x - radius, 0);
+    int start_y = pal_fmax(y - radius, 0);
+    int end_x =   pal_fmin(x + radius, PAL_SCREEN_WIDTH);
+    int end_y =   pal_fmin(y + radius, PAL_SCREEN_HEIGHT);
     int draw_x;
     int draw_y;
     pal_float_t dist;
 
     for (draw_y = start_y; draw_y <= end_y; draw_y++) {
         for (draw_x = start_x; draw_x <= end_x; draw_x++) {
-            dist = hypotf(draw_x - x, draw_y - y);
+            dist = pal_hypot(draw_x - x, draw_y - y);
 
             if (dist <= radius && dist > radius - stroke_width)
                 pal_screen_draw_pixel(draw_x, draw_y, c);
@@ -95,8 +123,8 @@ void graphics_draw_transformed_rect(int x, int y, int width, int height, struct 
     vec2_transform(&(struct vec2) {  width / 2,  height / 2 }, m, &br);
 
     // get start and end point for looping through screen pixels
-    struct vec2 start = { floor(fmin(tr.x, fmin(tl.x, fmin(bl.x, br.x)))), floor(fmin(tr.y, fmin(tl.y, fmin(bl.y, br.y)))) } ;
-    struct vec2 end =   { fmax(tr.x, fmax(tl.x, fmax(bl.x, br.x))), fmax(tr.y, fmax(tl.y, fmax(bl.y, br.y))) } ;
+    struct vec2 start = { pal_floor(pal_fmin(tr.x, pal_fmin(tl.x, pal_fmin(bl.x, br.x)))), pal_floor(pal_fmin(tr.y, pal_fmin(tl.y, pal_fmin(bl.y, br.y)))) } ;
+    struct vec2 end =   { pal_fmax(tr.x, pal_fmax(tl.x, pal_fmax(bl.x, br.x))), pal_fmax(tr.y, pal_fmax(tl.y, pal_fmax(bl.y, br.y))) } ;
 
     struct vec2 center_offset = { width / 2, height / 2 };
 
@@ -108,8 +136,8 @@ void graphics_draw_transformed_rect(int x, int y, int width, int height, struct 
             vec2_add(&p_trans, &center_offset, &p_trans);
 
             // NEED TO ROUND/FLOOR not truncate
-            col = round(p_trans.x);
-            row = round(p_trans.y);
+            col = pal_round(p_trans.x);
+            row = pal_round(p_trans.y);
 
             if (col >= 0 && row >= 0 && col < width && row < height) {
                 // draw
@@ -139,8 +167,8 @@ void graphics_draw_transformed_image(struct image *image, int x, int y, struct m
     vec2_transform(&(struct vec2) {  image->width / 2,  image->height / 2 }, m, &br);
 
     // get start and end point for looping through screen pixels
-    struct vec2 start = { fmin(tr.x, fmin(tl.x, fmin(bl.x, br.x))), fmin(tr.y, fmin(tl.y, fmin(bl.y, br.y))) - 1 } ;
-    struct vec2 end =   { fmax(tr.x, fmax(tl.x, fmax(bl.x, br.x))), fmax(tr.y, fmax(tl.y, fmax(bl.y, br.y))) + 1 } ;
+    struct vec2 start = { pal_fmin(tr.x, pal_fmin(tl.x, pal_fmin(bl.x, br.x))), pal_fmin(tr.y, pal_fmin(tl.y, pal_fmin(bl.y, br.y))) - 1 } ;
+    struct vec2 end =   { pal_fmax(tr.x, pal_fmax(tl.x, pal_fmax(bl.x, br.x))), pal_fmax(tr.y, pal_fmax(tl.y, pal_fmax(bl.y, br.y))) + 1 } ;
 
     struct vec2 center_offset = { image->width / 2, image->height / 2 };
 
@@ -152,8 +180,8 @@ void graphics_draw_transformed_image(struct image *image, int x, int y, struct m
             vec2_add(&p_trans, &center_offset, &p_trans);
 
             // NEED TO ROUND/FLOOR not truncate
-            col = round(p_trans.x);
-            row = round(p_trans.y);
+            col = pal_round(p_trans.x);
+            row = pal_round(p_trans.y);
 
             if (col >= 0 && row >= 0 && col < image->width && row < image->height) {
                 // draw
