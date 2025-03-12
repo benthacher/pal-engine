@@ -398,7 +398,6 @@ bool midi_parser_advance(struct midi_parser *parser, uint32_t delta_time_ns) {
             raw_delta_ticks = decode_variable_length_quantity(parser, i);
 
             parser->tracks[i].timer += raw_delta_ticks * parser->ns_per_tick;
-            parser->tracks[i].playback_time += (raw_delta_ticks * parser->ns_per_tick) / 1e9;
             parser->tracks[i].state = TRACK_STATE_WAIT_FOR_TIMER;
         }
 
