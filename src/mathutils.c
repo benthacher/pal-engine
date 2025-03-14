@@ -56,6 +56,14 @@ int pal_max(int a, int b) {
     return a > b ? a : b;
 }
 
+pal_float_t pal_modf(pal_float_t num, pal_float_t *integral) {
+#if defined PAL_USE_FLOAT32
+    return modff(num, integral);
+#else
+    return modf(num, integral);
+#endif
+}
+
 pal_float_t lerp(pal_float_t x1, pal_float_t x2, pal_float_t t) {
     return x1 * (1 - t) + x2 * t;
 }

@@ -80,6 +80,15 @@ int pal_min(int a, int b);
 int pal_max(int a, int b);
 
 /**
+ * @brief Separate a pal_float_t into integral and fractional parts
+ *
+ * @param num Number to get parts of
+ * @param integral pointer to location to return integral part of num
+ * @return pal_float_t fractional part
+ */
+pal_float_t pal_modf(pal_float_t num, pal_float_t *integral);
+
+/**
  * @brief Linear interpolation
  *
  * @param x1
