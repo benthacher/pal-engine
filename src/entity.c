@@ -212,26 +212,21 @@ void entity_scale(struct entity *entity, pal_float_t factor) {
     physics_scale_bounds(&entity->phys, factor);
 }
 
-static inline bool edge_test(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3) {
-    return (v3->x - v1->x) * (v2->y - v1->y) - (v3->y - v1->y) * (v2->x - v1->x) <= 0;
+static inline bool edge_test(int p1x, int p1y, int p2x, int p2y, int p3x, int p3y) {
+    return (p3x - p1x) * (p2y - p1y) - (p3y - p1y) * (p2x - p1x) <= 0;
 }
 
 static void render_triangle(struct vec2 *v1, struct vec2 *v2, struct vec2 *v3, struct color color) {
     // get start and end point for looping through screen pixels
-    struct vec2 start = {
-        .x = pal_floor(pal_fmax(pal_fmin(v1->x, pal_fmin(v2->x, v3->x)), 0.0)),
-        .y = pal_floor(pal_fmax(pal_fmin(v1->y, pal_fmin(v2->y, v3->y)), 0.0))
-    };
-    struct vec2 end = {
-        .x = pal_fmin(pal_fmax(v1->x, pal_fmax(v2->x, v3->x)), PAL_SCREEN_WIDTH),
-        .y = pal_fmin(pal_fmax(v1->y, pal_fmax(v2->y, v3->y)), PAL_SCREEN_HEIGHT)
-    };
+    int startx = pal_fmax(pal_fmin(v1->x, pal_fmin(v2->x, v3->x)), 0.0);
+    int starty = pal_fmax(pal_fmin(v1->y, pal_fmin(v2->y, v3->y)), 0.0);
+    int endx = pal_fmin(pal_fmax(v1->x, pal_fmax(v2->x, v3->x)), PAL_SCREEN_WIDTH);
+    int endy = pal_fmin(pal_fmax(v1->y, pal_fmax(v2->y, v3->y)), PAL_SCREEN_HEIGHT);
 
-    struct vec2 p = start;
-    for (p.y = start.y; p.y < end.y; p.y++) {
-        for (p.x = start.x; p.x < end.x; p.x++) {
-            if (edge_test(v1, v2, &p) && edge_test(v2, v3, &p) && edge_test(v3, v1, &p))
-                pal_screen_draw_pixel(p.x, p.y, color);
+    for (int py = starty; py < endy; py++) {
+        for (int px = startx; px < endx; px++) {
+            if (edge_test(v1->x, v1->y, v2->x, v2->y, px, py) && edge_test(v2->x, v2->y, v3->x, v3->y, px, py) && edge_test(v3->x, v3->y, v1->x, v1->y, px, py))
+                pal_screen_draw_pixel(px, py, color);
         }
     }
 }
@@ -242,32 +237,35 @@ static bool is_screen_pos_on_screen(int screen_x, int screen_y) {
 }
 
 static void entity_render_filled(struct entity *entity) {
-    struct vec2 entity_screen;
-    int entity_x, entity_y;
-    game_camera_world_to_screen(&entity->phys.position, &entity_x, &entity_y);
-    entity_screen.x = entity_x;
-    entity_screen.y = entity_y;
-
     if (entity->phys.bounds.type == BOUNDS_TYPE_POLY) {
-        struct vec2 *p1, *p2;
-        int p1_x, p1_y, p2_x, p2_y;
-        struct vec2 p1_screen, p2_screen;
-        for (int i = 0; i < entity->phys.translated_bounds.n_vertices; i++) {
-            p1 = &entity->phys.translated_bounds.vertices[i];
-            p2 = &entity->phys.translated_bounds.vertices[(i + 1) % entity->phys.translated_bounds.n_vertices];
+        struct vec2 *a, *b, *c;
+        int a_x, a_y, b_x, b_y, c_x, c_y;
+        struct vec2 a_screen, b_screen, c_screen;
 
-            // transform p1 and p2 to screen coordinates
-            game_camera_world_to_screen(p1, &p1_x, &p1_y);
-            game_camera_world_to_screen(p2, &p2_x, &p2_y);
+        a = &entity->phys.translated_bounds.vertices[0];
+        game_camera_world_to_screen(a, &a_x, &a_y);
 
-            p1_screen.x = p1_x;
-            p1_screen.y = p1_y;
-            p2_screen.x = p2_x;
-            p2_screen.y = p2_y;
+        a_screen.x = a_x;
+        a_screen.y = a_y;
 
-            render_triangle(&entity_screen, &p2_screen, &p1_screen, entity->color);
+        for (int i = 1; i < entity->phys.translated_bounds.n_vertices - 1; i++) {
+            b = &entity->phys.translated_bounds.vertices[i];
+            c = &entity->phys.translated_bounds.vertices[i + 1];
+
+            // transform b and c to screen coordinates
+            game_camera_world_to_screen(b, &b_x, &b_y);
+            game_camera_world_to_screen(c, &c_x, &c_y);
+
+            b_screen.x = b_x;
+            b_screen.y = b_y;
+            c_screen.x = c_x;
+            c_screen.y = c_y;
+
+            render_triangle(&a_screen, &c_screen, &b_screen, entity->color);
         }
     } else if (entity->phys.bounds.type == BOUNDS_TYPE_CIRCLE) {
+        int entity_x, entity_y;
+        game_camera_world_to_screen(&entity->phys.position, &entity_x, &entity_y);
         graphics_draw_circle(entity_x, entity_y, entity->phys.bounds.radius * mat2_det(game_camera_get_transform()), entity->color);
     }
 }
