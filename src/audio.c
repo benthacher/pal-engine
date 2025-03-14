@@ -212,7 +212,6 @@ static int32_t run_filter_chain(struct filter_node *filter_list_head, int32_t in
 
 static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
     int32_t sample = 0;
-    int active_voices = 0;
 
     // run effects
     struct effect_node *effect = osc->effect_list_head;
@@ -227,15 +226,11 @@ static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
 
         sample += (osc->waveform(osc->voices[v].t) * osc->voices[v].adsr.envelope_value / ENVELOPE_VALUE_SCALING) / OSC_AMPLITUDE * osc->voices[v].amplitude / OSC_AMPLITUDE;
         osc->voices[v].t = (osc->voices[v].t + osc->voices[v].t_increment) & OSC_PERIOD_MASK;
-        active_voices++;
 
         advance_adsr_envelope(&osc->voices[v].adsr);
     }
 
-    active_voices = 4;
-    // scale sample by active voices to leave room each voice
-    if (active_voices > 0)
-        sample = run_filter_chain(osc->filter_list_head, sample / active_voices);
+    sample = run_filter_chain(osc->filter_list_head, sample);
 
     return sample;
 }
@@ -243,34 +238,25 @@ static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
 static int32_t wave_sampler_get_sample_and_advance() {
     int32_t sample = 0;
     int32_t voice_sample;
-    int active_samples = 0;
-    int active_voice_samples;
 
     for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
         if (wave_samplers[i].wave_data == NULL)
             continue;
 
-        active_samples++;
-        active_voice_samples = 0;
         voice_sample = 0;
 
         for (int j = 0; j < MAX_CONCURRENT_SAMPLE_VOICES; j++) {
             if (!wave_samplers[i].channels[j].playing)
                 continue;
 
-            active_voice_samples++;
             voice_sample += wave_samplers[i].wave_data->data[wave_samplers[i].channels[j].pointer++] * wave_samplers[i].channels[j].amplitude / OSC_AMPLITUDE;
 
             if (wave_samplers[i].channels[j].pointer >= wave_samplers[i].wave_data->length)
                 wave_samplers[i].channels[j].playing = false;
         }
 
-        if (active_voice_samples > 0)
-            sample += voice_sample / active_voice_samples;
+        sample += voice_sample;
     }
-
-    if (active_samples > 0)
-        sample /= active_samples;
 
     return run_filter_chain(wave_samplers_filter_list_head, sample);
 }
@@ -416,7 +402,6 @@ void audio_add_filter(struct filter_node *filter) {
 static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
     int32_t sample;
     int32_t current_sample;
-    int num_active_oscillators;
     struct oscillator *osc;
 
     // add samples to buffer
@@ -424,41 +409,14 @@ static void audio_fill_buffer(audio_sample_t *samples, int num_samples) {
         if (running)
             advance_all_midi_players();
 
-        current_sample = num_active_oscillators = 0;
+        current_sample = wave_sampler_get_sample_and_advance();
 
         for (int osc_i = 0; osc_i < num_oscillators; osc_i++) {
-            sample = oscillator_get_sample_and_advance(oscillators[osc_i]);
-
-            if (sample == 0)
-                continue;
-
-            current_sample += sample;
-            num_active_oscillators++;
+            current_sample += oscillator_get_sample_and_advance(oscillators[osc_i]);
         }
 
-        // if (num_active_oscillators > 0)
-        //     current_sample /= num_active_oscillators;
-
-        current_sample += wave_sampler_get_sample_and_advance();
-
-        current_sample = run_filter_chain(master_filter_head, current_sample);
-
         // gotta figure out this mixer weirdness to balance all sounds
-        current_sample *= master_gain;
-
-        // if (amplitude * dynamic_mixer_gain > OSC_AMPLITUDE || amplitude * dynamic_mixer_gain < -OSC_AMPLITUDE) {
-        //     dynamic_mixer_gain = fabs((pal_float_t) OSC_AMPLITUDE / amplitude);
-        //     dynamic_mixer_timer = PAL_AUDIO_SAMPLE_RATE * 2;
-        // }
-
-        // current_sample *= dynamic_mixer_gain;
-
-        // if (dynamic_mixer_timer <= 0) {
-        //     // timer expired, increase mixer gain
-        //     dynamic_mixer_gain += 0.001;
-        // } else {
-        //     dynamic_mixer_timer--;
-        // }
+        current_sample = run_filter_chain(master_filter_head, current_sample) * master_gain;
 
         if (current_sample > OSC_AMPLITUDE)
             current_sample = OSC_AMPLITUDE;
