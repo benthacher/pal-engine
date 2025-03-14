@@ -203,8 +203,9 @@ wave_sample_t wave_sample_register(const struct wave_data *wave_data);
  *
  * @param sample
  * @param amplitude Amplitude of wave sample
+ * @param speed Speed multiplier of sample playback
  */
-void wave_sample_play(wave_sample_t sample, uint16_t amplitude);
+void wave_sample_play(wave_sample_t sample, uint16_t amplitude, pal_float_t speed);
 
 /**
  * @brief Initializes midi player

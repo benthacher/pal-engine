@@ -20,7 +20,8 @@ uint64_t current_sample_num = 0;
 struct polyphonic_wave_sampler {
     const struct wave_data *wave_data;
     struct channel {
-        uint32_t pointer;
+        pal_float_t pointer;
+        pal_float_t pointer_delta;
         uint16_t amplitude;
         bool playing;
     } channels[MAX_CONCURRENT_SAMPLE_VOICES];
@@ -74,7 +75,7 @@ wave_sample_t wave_sample_register(const struct wave_data *wave_data) {
     return (wave_sample_t) -1;
 }
 
-void wave_sample_play(wave_sample_t sample, uint16_t amplitude) {
+void wave_sample_play(wave_sample_t sample, uint16_t amplitude, pal_float_t speed) {
     if (sample == -1 || wave_samplers[sample].wave_data == NULL)
         return;
 
@@ -83,6 +84,7 @@ void wave_sample_play(wave_sample_t sample, uint16_t amplitude) {
         if (!wave_samplers[sample].channels[i].playing) {
             wave_samplers[sample].channels[i].playing = true;
             wave_samplers[sample].channels[i].pointer = 0;
+            wave_samplers[sample].channels[i].pointer_delta = pal_fmax(speed, 0.01);
             wave_samplers[sample].channels[i].amplitude = amplitude;
             return;
         }
@@ -238,6 +240,8 @@ static int32_t oscillator_get_sample_and_advance(struct oscillator *osc) {
 static int32_t wave_sampler_get_sample_and_advance() {
     int32_t sample = 0;
     int32_t voice_sample;
+    pal_float_t interpolated_sample;
+    pal_float_t interpolation_t, pointer_integral;
 
     for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
         if (wave_samplers[i].wave_data == NULL)
@@ -249,7 +253,15 @@ static int32_t wave_sampler_get_sample_and_advance() {
             if (!wave_samplers[i].channels[j].playing)
                 continue;
 
-            voice_sample += wave_samplers[i].wave_data->data[wave_samplers[i].channels[j].pointer++] * wave_samplers[i].channels[j].amplitude / OSC_AMPLITUDE;
+            wave_samplers[i].channels[j].pointer += wave_samplers[i].channels[j].pointer_delta;
+            interpolation_t = pal_modf(wave_samplers[i].channels[j].pointer, &pointer_integral);
+            interpolated_sample = lerp(
+                wave_samplers[i].wave_data->data[(size_t) pointer_integral],
+                wave_samplers[i].wave_data->data[(size_t) pointer_integral + 1],
+                interpolation_t
+            );
+
+            voice_sample += interpolated_sample * wave_samplers[i].channels[j].amplitude / OSC_AMPLITUDE;
 
             if (wave_samplers[i].channels[j].pointer >= wave_samplers[i].wave_data->length)
                 wave_samplers[i].channels[j].playing = false;
@@ -314,7 +326,7 @@ static void midi_channel_note_on(struct midi_player *player, uint8_t channel, ui
 
     if (channel == MIDI_DRUM_CHANNEL) {
         if (player->drum_samples[note_number] != WAVE_SAMPLE_INVALID)
-            wave_sample_play(player->drum_samples[note_number], amplitude);
+            wave_sample_play(player->drum_samples[note_number], amplitude, 1.0);
         else
             printf("unassigned drum sample on note %d! maybe make it hehe\n", note_number);
     } else {
