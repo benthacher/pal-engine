@@ -242,6 +242,7 @@ static int32_t wave_sampler_get_sample_and_advance() {
     int32_t voice_sample;
     pal_float_t interpolated_sample;
     pal_float_t interpolation_t, pointer_integral;
+    size_t left_sample_index;
 
     for (int i = 0; i < MAX_POLYPHONIC_WAVE_SAMPLERS; i++) {
         if (wave_samplers[i].wave_data == NULL)
@@ -254,17 +255,21 @@ static int32_t wave_sampler_get_sample_and_advance() {
                 continue;
 
             wave_samplers[i].channels[j].pointer += wave_samplers[i].channels[j].pointer_delta;
+
+            if (wave_samplers[i].channels[j].pointer >= wave_samplers[i].wave_data->length - 1) {
+                wave_samplers[i].channels[j].playing = false;
+                continue;
+            }
+
             interpolation_t = pal_modf(wave_samplers[i].channels[j].pointer, &pointer_integral);
+            left_sample_index = (size_t) pointer_integral;
             interpolated_sample = lerp(
-                wave_samplers[i].wave_data->data[(size_t) pointer_integral],
-                wave_samplers[i].wave_data->data[(size_t) pointer_integral + 1],
+                wave_samplers[i].wave_data->data[left_sample_index],
+                wave_samplers[i].wave_data->data[left_sample_index + 1],
                 interpolation_t
             );
 
             voice_sample += interpolated_sample * wave_samplers[i].channels[j].amplitude / OSC_AMPLITUDE;
-
-            if (wave_samplers[i].channels[j].pointer >= wave_samplers[i].wave_data->length)
-                wave_samplers[i].channels[j].playing = false;
         }
 
         sample += voice_sample;
